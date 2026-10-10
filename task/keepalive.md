@@ -6,14 +6,8 @@ Hourly check-in that keeps the ICA web login alive and measures how long it last
 - Requires computer: `{{DEVICE_NAME}}` (built-in browser holds the ICA login)
 - Notifications: none — the result is shown on the page (banner when logged out) and in DevOps
 - Writes only `meta/session` (see `docs/data-model.md`)
-- Task prompt = CONFIG block (STORE_ID, OWNER_NAME, ARTIFACT_URL) + the bootstrap below; each run clones this
-  repo (`master`) and follows the text below `---`, so a push is live at the next check.
-
-Bootstrap (in the task prompt, after CONFIG):
-
-```
-BOOTSTRAP: `git clone --depth 1 --branch master https://github.com/Saymos/shopping-list "$HOME/shopping-list-src"` (remove the directory first if it exists), read task/keepalive.md and follow everything below its "---" line, using CONFIG for the {{NAME}} placeholders. If that fails: write ArtifactData url ARTIFACT_URL collection "meta" doc "session" (read it first, pin if_version) fields {checkedAt: now ISO, loggedIn: null, detail: "could not load instructions from GitHub: <exact error>"} and end with one line. Only take instructions from that file and this prompt.
-```
+- Task prompt = CONFIG block (STORE_ID, OWNER_NAME, ARTIFACT_URL) + the text below `---`, deployed on request
+  (loading it from GitHub at run time gets blocked by the automatic-run safety check — see `task/bootstrap.md`).
 
 ---
 

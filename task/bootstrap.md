@@ -1,7 +1,13 @@
 # Scheduled task: "ICA shopping list sync"
 
-Lives in Anthropic's scheduler. Its prompt is only the private CONFIG block (`config.example.md`) + the bootstrap
-below; the real logic is loaded from this repo (`agent/sync-instructions.md`, branch `master`) on every run.
+Lives in Anthropic's scheduler. Its prompt = the private CONFIG block (`config.example.md`, incl. DEPLOYED_FROM) +
+everything below `---` in `agent/sync-instructions.md`, deployed on request by Claude from a chat linked to the computer.
+
+## Why the bootstrap below is NOT used
+
+Tested 2026-10-10 with the repo public: the clone works, but the automatic-run safety check then refused to open
+the ICA page ("Browser Navigate Exfil") because the browser instructions came from a downloaded file instead of
+the task prompt. That check is working as intended, so instructions stay in the task prompt.
 
 - Task id: `{{TASK_ID}}`
 - Model: `claude-opus-5-5`
@@ -10,9 +16,9 @@ below; the real logic is loaded from this repo (`agent/sync-instructions.md`, br
 - Schedule: none — the page books one-shot runs (`update_trigger run_once_at = next whole minute`)
 - Notifications: push
 - Changing the task prompt (CONFIG or bootstrap) requires approval from a Claude chat linked to that computer.
-  Changing the logic only needs a push to `master`.
+  Changing the logic = push + ask Claude to deploy.
 
-## Task prompt (after the CONFIG block)
+## Bootstrap prompt (kept for reference, not in use)
 
 ```
 BOOTSTRAP — load the instructions from GitHub, then follow them.
