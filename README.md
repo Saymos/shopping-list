@@ -7,11 +7,11 @@ Household-specific values (store, names, links, ids) are not in this repo — se
 
 | Path | What | Live? |
 |---|---|---|
-| `agent/sync-instructions.md` | The agent's logic (source of truth). | Deployed to the scheduled task on request |
+| `agent/sync-instructions.md` | The sync agent's logic. | **Live** — every run clones `master` |
 | `page/inkopslistan.html` | Page source (UI). | Source of truth; deployed by publishing to the artifact (see below) |
 | `docs/data-model.md` | Database collections and fields. | Reference |
-| `task/bootstrap.md` | Scheduled task settings + an (unused) repo-bootstrap prompt. | Reference |
-| `task/keepalive.md` | Hourly ICA login check-in (scheduled task "ICA login keepalive"). | Deployed copy lives in the task |
+| `task/bootstrap.md` | Sync task settings + its bootstrap prompt. | Copy of what's in the task |
+| `task/keepalive.md` | Hourly ICA login check-in (scheduled task "ICA login keepalive"). | **Live** — every check clones `master` |
 | `config.example.md` | The private CONFIG block, with placeholder values. | Template |
 
 ## Parts and where they run
@@ -20,7 +20,7 @@ Household-specific values (store, names, links, ids) are not in this repo — se
 |---|---|
 | Page | claude.ai artifact `{{ARTIFACT_URL}}` (needs claude.ai for `db`, `user`, `mcp` capabilities) |
 | Database | Anthropic-hosted store attached to the artifact (see `docs/data-model.md`) |
-| Agent runtime | Scheduled task "ICA shopping list sync" → fresh cloud Claude session per run, prompt = CONFIG block + deployed copy of `agent/sync-instructions.md` |
+| Agent runtime | Scheduled task "ICA shopping list sync" → fresh cloud Claude session per run, prompt = CONFIG block + bootstrap that clones this repo and follows `agent/sync-instructions.md` |
 | Browser + ICA login | Claude desktop app's built-in browser on the household computer (`{{DEVICE_NAME}}`) |
 
 ## Flow
@@ -28,12 +28,12 @@ Household-specific values (store, names, links, ids) are not in this repo — se
 1. Household edits items/prefs on the page → DB.
 2. **Synka nu** (owner): page writes `meta/request {mode:"sync"}` and books the task for the next whole minute
    (`update_trigger run_once_at`). Scheduler-started runs get the PC attached; direct `fire_trigger` from a browser doesn't.
-3. Run: follow the deployed instructions → read DB → drive ICA in the desktop app's browser → write results + `runs/<id>` log (DevOps panel shows the commit used).
+3. Run: clone this repo → follow `agent/sync-instructions.md` → read DB → drive ICA in the desktop app's browser → write results + `runs/<id>` log (DevOps panel shows the commit used).
 4. **Jag har beställt** → same with `mode:"ordered"`: reads the latest placed ICA order into `orders`.
 
 ## Changing things
 
-- **Agent logic:** edit `agent/sync-instructions.md`, push, then ask Claude (in a chat linked to the household computer) to deploy it to the task.
+- **Agent logic:** edit `agent/sync-instructions.md` (or `task/keepalive.md`), push to `master`. The next run uses it; DevOps shows the commit.
 - **Page:** edit `page/inkopslistan.html`, push, then ask Claude to "publish the page from the repo" (republishes to the same artifact URL).
 - **Task settings / bootstrap:** only via Claude in a chat linked to the household computer; then update `task/bootstrap.md`.
 

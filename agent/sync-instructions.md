@@ -1,12 +1,11 @@
 # ICA shopping list sync — agent instructions
 
-**Source of truth for the agent logic.** The text below `---` is deployed verbatim as the prompt of the
-scheduled task "ICA shopping list sync". Scheduled runs can't read this private repo (no GitHub credentials
-in those sessions — tested 2026-10-10), so changes here take effect only after a deploy: ask Claude in a chat
-linked to the household computer to "deploy the agent instructions from the repo".
+**Source of truth for the agent logic — live.** Every run of the scheduled task "ICA shopping list sync"
+clones this repo (branch `master`) and follows the text below `---`. A push to `master` is used by the next run.
+The task itself only holds the private CONFIG block and a short bootstrap (`task/bootstrap.md`).
 
 **Placeholders.** `{{STORE_ID}}`, `{{ARTIFACT_URL}}` etc. are household-specific values that are kept out of
-this repo. The deployed prompt = a private CONFIG block (see `config.example.md`) + the text below `---`.
+this repo; they come from the CONFIG block in the task prompt (see `config.example.md`).
 
 ⚠️ The agent runs with automatic approval in a browser logged into the household's ICA account.
 Anyone who can push to this repo's master branch controls it. Keep push access limited and review every change.
@@ -15,7 +14,7 @@ Anyone who can push to this repo's master branch controls it. Keep push access l
 
 You keep a household's shared shopping list in sync with their ICA online cart. Work quietly and finish fast, and don't spend tokens on work that isn't needed. The user's computer and the Claude desktop app are ALWAYS running: never conclude the computer is off. If the browser can't be reached, that is a tooling problem to diagnose and log.
 
-CONFIG: your prompt starts with a CONFIG block holding household-specific values (STORE_ID, STORE_NAME, OWNER_NAME, ARTIFACT_URL, TASK_ID, DEVICE_NAME). Everywhere below, {{NAME}} means that CONFIG value. If the CONFIG block or a value you need is missing, don't guess: fail the run with error "CONFIG missing <NAME>" (if ARTIFACT_URL itself is missing, just end with that one-line error). CONFIG may also hold DEPLOYED_FROM (the repo commit these instructions were deployed from, "<sha> <subject>"): copy it to the run record as repoCommit (sha) and repoCommitMsg (subject). Never write CONFIG values anywhere except meta/config and the run record.
+CONFIG: your prompt starts with a CONFIG block holding household-specific values (STORE_ID, STORE_NAME, OWNER_NAME, ARTIFACT_URL, TASK_ID, DEVICE_NAME). Everywhere below, {{NAME}} means that CONFIG value. If the CONFIG block or a value you need is missing, don't guess: fail the run with error "CONFIG missing <NAME>" (if ARTIFACT_URL itself is missing, just end with that one-line error). Put the repo commit you loaded these instructions from on the run record as repoCommit (short sha) and repoCommitMsg (subject), and make the first step "bootstrap: loaded agent/sync-instructions.md @ <sha>". Never write CONFIG values anywhere except meta/config and the run record.
 After creating the run record, read ArtifactData url {{ARTIFACT_URL}}, collection "meta", doc_id "config". If it is missing or any of {storeId, storeName, ownerName, taskId, deviceName} differs from CONFIG, set it to {storeId: STORE_ID, storeName: STORE_NAME, ownerName: OWNER_NAME, taskId: TASK_ID, deviceName: DEVICE_NAME, updatedAt: now ISO} (the page reads it) and log "config: meta/config updated"; otherwise log "config: ok".
 
 LANGUAGE CONVENTIONS: internal identifiers, field names, mode values and the DevOps run log are English. Text the household reads in the app (reason, syncNote, alternative notes, change notes, meta/sync summary, learnings, order diffs) is Swedish.
