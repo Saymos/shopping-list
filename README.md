@@ -7,7 +7,7 @@ A shared shopping list for the household that Claude syncs into the ICA online c
 
 | Path | What | Live? |
 |---|---|---|
-| `agent/sync-instructions.md` | The agent's logic. Every sync run clones this repo and follows this file. | **Yes** — push = next run uses it |
+| `agent/sync-instructions.md` | The agent's logic. Every sync run clones branch `master` and follows this file. | **Yes** — push = next run uses it |
 | `page/inkopslistan.html` | Page source (UI). | Source of truth; deployed by publishing to the artifact (see below) |
 | `docs/data-model.md` | Database collections and fields. | Reference |
 | `task/bootstrap.md` | The fixed prompt + settings of the scheduled task. | Reference (the task lives in Anthropic's scheduler) |

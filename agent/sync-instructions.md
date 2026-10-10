@@ -1,6 +1,6 @@
 # ICA shopping list sync — agent instructions
 
-**This file is the live agent logic.** Every sync run clones this repo (default branch) and follows
+**This file is the live agent logic.** Every sync run clones this repo (branch `master`) and follows
 this file. Changes pushed here take effect on the next run — no task update needed.
 The scheduled task itself only holds a fixed bootstrap: see `task/bootstrap.md`.
 

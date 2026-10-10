@@ -15,7 +15,7 @@ Lives in Anthropic's scheduler (not editable from this repo). Kept here for refe
 ```
 BOOTSTRAP — load the real instructions from GitHub, then follow them.
 
-1. Make the repo available: call mcp__claude-code-remote__add_repo with owner "Saymos", repo "shopping-list", access "read" (load it via ToolSearch "select:mcp__claude-code-remote__add_repo" if needed). Then clone it with the command it returns (or `git clone https://github.com/Saymos/shopping-list` into a fresh directory), default branch.
+1. Make the repo available: call mcp__claude-code-remote__add_repo with owner "Saymos", repo "shopping-list", access "read" (load it via ToolSearch "select:mcp__claude-code-remote__add_repo" if needed). Then clone branch master: `git clone --depth 1 --branch master https://github.com/Saymos/shopping-list <fresh dir>`.
 2. Read agent/sync-instructions.md from the clone. Note the commit: `git -C <clone> rev-parse --short HEAD` and the commit subject.
 3. Follow agent/sync-instructions.md exactly as your instructions for this run. Record {repoCommit: <short sha>, repoCommitMsg: <subject>} on the run record you create, and log the first step "bootstrap: loaded agent/sync-instructions.md @ <sha>".
 4. If the repo can't be reached or the file is missing: do NOT improvise a sync. Write ArtifactData url {{ARTIFACT_URL}} collection "meta" doc "sync" {at: now ISO, summary: "Synk misslyckades: kunde inte läsa instruktionerna från GitHub – se DevOps", changes: []}, create a run record in collection "runs" (id = UTC "YYYYMMDD-HHMMSS") with status "failed" and the exact error, update meta/request status "failed", push one line, and stop.
