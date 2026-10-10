@@ -42,6 +42,7 @@ List entries. Written by the page (household) and the agent.
 - `meta/request` `{mode, requestedAt, runAt, status, requestedBy, handledAt, runId}` — what the next run should do.
 - `meta/sync` `{at, summary, runId, changes}` — last run summary shown on the page.
 - `meta/prefs` `{changedAt, changedBy}` — bumped on any pref change; drives C3 skipping.
+- `meta/config` `{storeId, storeName, ownerName, taskId, deviceName, updatedAt}` — household-specific values the page needs. Written only by the sync agent from the task's CONFIG block (master copy).
 
 ## change entry
 `{type:"added"|"removed"|"swapped"|"replaced"|"not_found"|"updated", item, product?, from?, to?, qty?, price?, note?}`

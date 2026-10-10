@@ -185,7 +185,7 @@ li.flash{box-shadow:inset 4px 0 0 var(--accent)}
 <div class="wrap">
   <header>
     <h1>Inköpslistan</h1>
-    <span class="store">{{STORE_NAME}}</span>
+    <span class="store" id="storeName">ICA</span>
   </header>
   <nav class="tabs" aria-label="Hoppa till">
     <a href="#lista">Lista</a><a href="#onskemal">Preferenser</a><a href="#lardomar">Claudes lärdomar</a><a href="#bestallningar">Beställningar</a><a href="#devops" id="tabDevops" hidden>DevOps</a>
@@ -225,7 +225,7 @@ li.flash{box-shadow:inset 4px 0 0 var(--accent)}
     <p class="hint" id="actionMsg" hidden></p>
     <p class="hint">Synken lägger till nya varor, följer era preferenser och letar erbjudanden och billigare likvärdiga varor för det som är nytt. Sedan betalar du själv hos ICA.</p>
     <div class="actions">
-      <a class="cartlink" href="https://handlaprivatkund.ica.se/stores/{{STORE_ID}}/basket" target="_blank" rel="noopener">Öppna varukorgen hos ICA ↗</a>
+      <a class="cartlink" id="cartLink" hidden target="_blank" rel="noopener">Öppna varukorgen hos ICA ↗</a>
       <button class="link" id="orderedBtn" type="button" hidden>Jag har beställt</button>
     </div>
     <div class="actions" id="confirmOrdered" hidden>
@@ -282,7 +282,15 @@ li.flash{box-shadow:inset 4px 0 0 var(--accent)}
 
 <script>
 const $ = id => document.getElementById(id);
-const TASK_ID = "{{TASK_ID}}";
+// Household-specific values live in the DB (meta/config, kept in step by the sync agent), not in this file.
+let CFG={}, TASK_ID=null;
+const ownerName = () => CFG.ownerName || "ägaren";
+function applyConfig(){
+  TASK_ID = CFG.taskId || null;
+  $("storeName").textContent = CFG.storeName || "ICA";
+  const a=$("cartLink");
+  if(CFG.storeId){ a.href="https://handlaprivatkund.ica.se/stores/"+encodeURIComponent(CFG.storeId)+"/basket"; a.hidden=false; } else a.hidden=true;
+}
 let db=null, user=null, mcp=null, myId=null, isOwner=false;
 let items=[], prefs=[], learns=[], names={}, editing=null;
 
@@ -321,7 +329,7 @@ function confirmBtn(label, onYes, cls){
 }
 function showBanner(t){ const b=$("banner"); b.textContent=t; b.hidden=!t; }
 function actionMsg(t){ const m=$("actionMsg"); m.textContent=t; m.hidden=!t; }
-async function write(p){ try{ await p; }catch(e){ showBanner(e&&e.code==="invalid_argument" ? "Du har bara läsrätt. Be {{OWNER_NAME}} ge dig behörigheten Contributor." : "Kunde inte spara. Försök igen."); } }
+async function write(p){ try{ await p; }catch(e){ showBanner(e&&e.code==="invalid_argument" ? "Du har bara läsrätt. Be "+ownerName()+" ge dig behörigheten Contributor." : "Kunde inte spara. Försök igen."); } }
 
 let editingItem=null, editDraft=null, pendingFocus=null;
 // Any change to the preference list bumps meta/prefs.changedAt, so the sync can skip re-checking items checked after that.
@@ -688,6 +696,7 @@ $("orderedYes").onclick=async()=>{
 
 async function fire(mode, btn, label){
   if(!mcp) return;
+  if(!TASK_ID){ showBanner("Konfiguration saknas (meta/config). Be Claude i chatten att lägga in den."); return; }
   $("syncBtn").disabled=true; $("orderedBtn").disabled=true; btn.textContent="Startar…"; actionMsg("");
   try{
     // Runs started by the scheduler get the PC attached; direct fires from a browser don't. So schedule a one-shot run at the next whole minute (≥30 s ahead).
@@ -793,7 +802,8 @@ function renderTaskState(){
     rows.push(["Model", (task.derived_state&&task.derived_state.model)||""]);
     rows.push(["Approvals", (task.derived_state&&task.derived_state.permission_mode)||""]);
   } else if(taskErr) rows.push(["Task", "could not load: "+taskErr]);
-  rows.push(["Task id", TASK_ID]);
+  rows.push(["Task id", TASK_ID||"(missing in meta/config)"]);
+  rows.push(["Config", CFG.storeId ? "store "+CFG.storeId+" · device "+(CFG.deviceName||"?")+(CFG.updatedAt?" · updated "+whenEn(CFG.updatedAt):"") : "meta/config missing"]);
   const dl=el("dl","kv"); rows.forEach(([k,v])=>{ if(v){ dl.append(el("dt",null,k), el("dd",null,v)); } }); box.append(dl);
   $("cancelRun").hidden = !(task && task.enabled && task.run_once_at);
 }
@@ -805,6 +815,7 @@ function payloadOf(res){
 }
 async function loadTask(){
   if(!mcp){ taskErr="no connector"; renderTaskState(); return; }
+  if(!TASK_ID){ taskErr="meta/config has no taskId"; task=null; renderTaskState(); return; }
   try{
     const res=await mcp.callTool("Claude Code Remote","list_triggers",{limit:20, include_completed:true},{cache:false});
     const p=payloadOf(res); const list=(p&&p.data)||[];
@@ -814,6 +825,7 @@ async function loadTask(){
 }
 $("refreshTask").onclick=loadTask;
 $("cancelRun").onclick=async()=>{
+  if(!TASK_ID) return;
   try{ await mcp.callTool("Claude Code Remote","update_trigger",{trigger_id:TASK_ID, enabled:false}); if(request) await write(db.doc("meta/request").update({status:"cancelled"})); }catch(e){ showBanner("Could not cancel the scheduled run."); }
   loadTask();
 };
@@ -843,8 +855,14 @@ $("addBtn").disabled=true; $("prefBtn").disabled=true;
     mcp=await c.use("mcp");
     if(mcp) $("ownerActions").hidden=false; else actionMsg("Knapparna fungerar inte i den här vyn. Be Claude i chatten i stället.");
   } else {
-    actionMsg("{{OWNER_NAME}} startar synk och genomgång. Det ni lägger till ligger kvar tills dess.");
+    actionMsg(ownerName()+" startar synk och genomgång. Det ni lägger till ligger kvar tills dess.");
   }
+  db.doc("meta/config").onSnapshot(s=>{
+    CFG = s.exists ? (s.data()||{}) : {};
+    applyConfig();
+    if(!isOwner) actionMsg(ownerName()+" startar synk och genomgång. Det ni lägger till ligger kvar tills dess.");
+    else { loadTask(); renderTaskState(); }
+  }, ()=>{});
   renderItems(); renderPrefs(); renderLearns();
   db.collection("items").onSnapshot(s=>{ items=s.docs.map(d=>({id:d.id,...d.data()})).filter(i=>i.status!=="ordered"); renderItems(); }, ()=>showBanner("Tappade kontakten med listan. Ladda om sidan."));
   db.collection("prefs").onSnapshot(s=>{ prefs=s.docs.map(d=>({id:d.id,...d.data()})); if(!editing) renderPrefs(); }, ()=>{});

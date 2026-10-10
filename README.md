@@ -1,7 +1,7 @@
 # shopping-list — Inköpslistan + ICA sync
 
-A shared shopping list for the household that Claude syncs into the ICA online cart at
-{{STORE_NAME}} (store {{STORE_ID}}).
+A shared shopping list for the household that Claude syncs into the household's ICA online cart.
+Household-specific values (store, names, links, ids) are not in this repo — see **Config** below.
 
 ## Repo layout
 
@@ -11,6 +11,7 @@ A shared shopping list for the household that Claude syncs into the ICA online c
 | `page/inkopslistan.html` | Page source (UI). | Source of truth; deployed by publishing to the artifact (see below) |
 | `docs/data-model.md` | Database collections and fields. | Reference |
 | `task/bootstrap.md` | Scheduled task settings + an (unused) repo-bootstrap prompt. | Reference |
+| `config.example.md` | The private CONFIG block, with placeholder values. | Template |
 
 ## Parts and where they run
 
@@ -18,8 +19,8 @@ A shared shopping list for the household that Claude syncs into the ICA online c
 |---|---|
 | Page | claude.ai artifact `{{ARTIFACT_URL}}` (needs claude.ai for `db`, `user`, `mcp` capabilities) |
 | Database | Anthropic-hosted store attached to the artifact (see `docs/data-model.md`) |
-| Agent runtime | Scheduled task "ICA shopping list sync" → fresh cloud Claude session per run, prompt = deployed copy of `agent/sync-instructions.md` |
-| Browser + ICA login | Claude desktop app's built-in browser on {{DEVICE_NAME}} |
+| Agent runtime | Scheduled task "ICA shopping list sync" → fresh cloud Claude session per run, prompt = CONFIG block + deployed copy of `agent/sync-instructions.md` |
+| Browser + ICA login | Claude desktop app's built-in browser on the household computer (`{{DEVICE_NAME}}`) |
 
 ## Flow
 
@@ -31,14 +32,28 @@ A shared shopping list for the household that Claude syncs into the ICA online c
 
 ## Changing things
 
-- **Agent logic:** edit `agent/sync-instructions.md`, push, then ask Claude (in a chat linked to {{DEVICE_NAME}}) to deploy it to the task.
+- **Agent logic:** edit `agent/sync-instructions.md`, push, then ask Claude (in a chat linked to the household computer) to deploy it to the task.
 - **Page:** edit `page/inkopslistan.html`, push, then ask Claude to "publish the page from the repo" (republishes to the same artifact URL).
-- **Task settings / bootstrap:** only via Claude in a chat linked to {{DEVICE_NAME}}; then update `task/bootstrap.md`.
+- **Task settings / bootstrap:** only via Claude in a chat linked to the household computer; then update `task/bootstrap.md`.
+
+## Config
+
+The repo uses placeholders like `{{STORE_ID}}`. The real values live in two private places:
+
+| Where | Holds | Who reads it |
+|---|---|---|
+| CONFIG block at the top of the scheduled task's prompt | all values (see `config.example.md`) | the sync agent |
+| `meta/config` in the page's database | storeId, storeName, ownerName, taskId, deviceName | the page (store name, cart link, sync button, DevOps) |
+
+The task's CONFIG block is the master copy: every run rewrites `meta/config` if it differs. To change a value,
+ask Claude (in a chat linked to the household computer) to update the CONFIG block; the next run updates the page.
+The published page is byte-identical to `page/inkopslistan.html`.
 
 ## Security
 
-The agent runs with automatic approval in a browser logged into the ICA account. **Anyone with push access
-here controls it.** Keep the repo private; don't add collaborators with write access unless intended.
+The agent runs with automatic approval in a browser logged into the ICA account. **Anyone who can push to
+`master` controls it.** Protect `master` (PRs only, no force-push), use 2FA, don't add collaborators with write
+access unless intended, review every merged line, and never commit secrets or household values — use the CONFIG block.
 
 ## Costs
 
