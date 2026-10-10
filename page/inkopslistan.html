@@ -771,7 +771,7 @@ function renderRuns(){
     d.append(s);
     const body=el("div","body");
     const kv=el("dl","kv");
-    [["Run id",r.id],["Session",r.sessionId],["Trigger",r.trigger],["Started",r.startedAt],["Finished",r.finishedAt],["Duration",dur(r.startedAt,r.finishedAt)],["Device",r.device],["Cart total",typeof r.cartTotal==="number"?kr(r.cartTotal):""],["Error",r.error]].forEach(([k,v])=>{ if(v){ kv.append(el("dt",null,k), el("dd",null,String(v))); } });
+    [["Run id",r.id],["Commit",r.repoCommit ? r.repoCommit+(r.repoCommitMsg?" · "+r.repoCommitMsg:"") : ""],["Session",r.sessionId],["Trigger",r.trigger],["Started",r.startedAt],["Finished",r.finishedAt],["Duration",dur(r.startedAt,r.finishedAt)],["Device",r.device],["Cart total",typeof r.cartTotal==="number"?kr(r.cartTotal):""],["Error",r.error]].forEach(([k,v])=>{ if(v){ kv.append(el("dt",null,k), el("dd",null,String(v))); } });
     body.append(kv);
     const ch=Array.isArray(r.changes)?r.changes:[];
     if(ch.length){ body.append(el("span","alts-label","Changes ("+ch.length+")")); const ul=el("ul","chg"); ch.forEach(c=>ul.append(changeRow(c,true))); body.append(ul); }
