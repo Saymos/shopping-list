@@ -2,7 +2,7 @@
 
 Hourly check-in that keeps the ICA web login alive and measures how long it lasts. It never shops.
 
-- Schedule: hourly
+- Schedule: every 30 min via two identical tasks ("ICA login keepalive" at :51, "ICA login keepalive (:21)" at :21) — the scheduler allows at most one run per hour per task
 - Requires computer: `{{DEVICE_NAME}}` (built-in browser holds the ICA login)
 - Notifications: none — the result is shown on the page (banner when logged out) and in DevOps
 - Writes only `meta/session` (see `docs/data-model.md`)
