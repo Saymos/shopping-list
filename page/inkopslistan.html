@@ -1,0 +1,865 @@
+<title>Inköpslistan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;500;600&display=swap">
+<style>
+/* Layout: one narrow phone column — sticky add bar, list grouped by status, actions, then wishes and learnings */
+:root{
+  --bg:#f3f5f2; --surface:#ffffff; --fg:#1b211c; --muted:#5f6b62; --line:#dde3dc;
+  --accent:#b8213f; --accent-fg:#ffffff; --accent-soft:#f8e3e7;
+  --ok:#2d7a4b; --ok-soft:#e1f0e6; --warn:#a35b00; --warn-soft:#fbeedb;
+  --display:"Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --body:"Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#121512; --surface:#1b201c; --fg:#e8ede8; --muted:#9aa69d; --line:#2c332d;
+  --accent:#f0627e; --accent-fg:#1a0a0e; --accent-soft:#3a1b22;
+  --ok:#6fc994; --ok-soft:#173022; --warn:#f0b35c; --warn-soft:#352813; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#121512; --surface:#1b201c; --fg:#e8ede8; --muted:#9aa69d; --line:#2c332d;
+  --accent:#f0627e; --accent-fg:#1a0a0e; --accent-soft:#3a1b22;
+  --ok:#6fc994; --ok-soft:#173022; --warn:#f0b35c; --warn-soft:#352813; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{background:var(--bg)}
+body{color:var(--fg);font-family:var(--body);font-size:16px;line-height:1.45;padding-inline:16px;padding-block:0 48px}
+/* Layout: one column on phones/tablets; on desktop the list gets the wide left column and everything else a sidebar */
+.wrap{max-width:680px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+.layout{display:flex;flex-direction:column;gap:20px}
+.col-main,.col-side{display:flex;flex-direction:column;gap:20px;min-width:0}
+@media (min-width:960px){
+  .wrap{max-width:1360px;padding-inline:8px}
+  .layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(340px,420px);gap:36px;align-items:start}
+  .addbar{padding-top:0}
+  #item{font-size:1.1rem}
+  li{padding:14px 18px}
+  li.row2 .altGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px}
+  li.row2 details.alts .alt{flex-direction:column;align-items:stretch;justify-content:space-between;gap:10px}
+  li.row2 details.alts .alt .main{flex:1}
+  li.row2 details.alts .altBtns{justify-content:stretch}
+  li.row2 details.alts .alt button{flex:1}
+  li.row2 details.alts .picker{grid-column:1 / -1}
+}
+header{padding-top:20px;display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+h1{font-family:var(--display);font-weight:800;font-size:2rem;letter-spacing:-.02em;margin:0;text-wrap:balance}
+.store{font-size:.85rem;color:var(--muted)}
+.addbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:8px}
+form{display:flex;gap:8px}
+input[type=text]{flex:1;min-width:0;font:inherit;padding:12px 14px;border-radius:12px;border:1.5px solid var(--line);background:var(--surface);color:var(--fg)}
+#item{font-size:1.05rem;padding:14px 16px;border-radius:14px}
+input[type=text]:focus{outline:none;border-color:var(--accent)}
+button{font:inherit;cursor:pointer}
+.add{font-weight:600;padding:0 18px;border:0;border-radius:14px;background:var(--accent);color:var(--accent-fg);font-size:1rem;min-height:44px}
+.add:disabled,.ghost:disabled{opacity:.5;cursor:default}
+.ghost{font-weight:600;padding:10px 16px;border-radius:12px;border:1.5px solid var(--accent);background:var(--surface);color:var(--accent);min-height:44px}
+.link{border:0;background:transparent;color:var(--muted);text-decoration:underline;font-size:.85rem;padding:6px 2px}
+.hint{font-size:.8rem;color:var(--muted);margin:6px 2px 0}
+section{display:flex;flex-direction:column;gap:8px;scroll-margin-top:90px}
+h2{font-family:var(--display);font-weight:600;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 2px;display:flex;gap:8px;align-items:center}
+.count{font-variant-numeric:tabular-nums;background:var(--line);color:var(--fg);border-radius:99px;padding:1px 8px;font-size:.75rem;letter-spacing:0}
+ul{list-style:none;margin:0;padding:0;background:var(--surface);border-radius:16px;border:1px solid var(--line);overflow:hidden}
+li{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;padding:12px 14px;border-top:1px solid var(--line)}
+li:first-child{border-top:0}
+.qty{font-family:var(--display);font-weight:800;font-variant-numeric:tabular-nums;min-width:2.2ch;text-align:right;color:var(--accent)}
+.main{flex:1;min-width:0}
+/* list rows: grid with a full-width detail area */
+li.row2{display:grid;grid-template-columns:2.2ch minmax(0,1fr) auto;column-gap:10px;row-gap:6px;align-items:start}
+li.row2 .qty{padding-top:2px}
+li.row2 .title{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;min-width:0}
+li.row2 .title .name{min-width:0}
+li.row2 .title .pill{font-size:.66rem;padding:2px 7px}
+li.row2 .acts{display:flex;align-items:center;gap:2px;flex-wrap:wrap;justify-content:flex-end;margin-top:-6px;margin-right:-8px}
+li.row2 .sub{grid-column:2 / -1;display:flex;flex-direction:column;gap:4px;min-width:0}
+li.row2 .sub .alts{padding-left:0;margin-top:2px}
+li.row2 .toggle{white-space:nowrap}
+@media (max-width:520px){
+  li{padding:12px 12px}
+  li.row2{column-gap:8px}
+  li.row2 .sub{grid-column:1 / -1}
+  li.row2 .icon{width:36px;height:36px}
+  .alts .alt{flex-direction:column;align-items:stretch;gap:8px;text-align:left}
+  .alts .alt .main{flex:none}
+  .alts .altBtns{justify-content:stretch}
+  .alts .alt button{flex:1;padding:8px 10px}
+  .lineRow .prod,.prod{font-size:.85rem}
+  #list-prefs li,#list-learn li{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center}
+  #list-prefs li .main,#list-learn li .main{grid-column:1 / -1}
+  #list-prefs li .toggle,#list-learn li .toggle{justify-self:start}
+  .confirmQ{display:none}
+  .qtyrow{flex-wrap:wrap}
+  .qtyrow .prod{flex-basis:100%}
+}
+.name{font-weight:600;overflow-wrap:anywhere}
+.meta{font-size:.82rem;color:var(--muted);overflow-wrap:anywhere}
+.why{font-size:.82rem;color:var(--fg);margin-top:2px;overflow-wrap:anywhere}
+.price{font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
+.pill{font-size:.72rem;font-weight:600;padding:3px 8px;border-radius:99px;white-space:nowrap}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.acc{background:var(--accent-soft);color:var(--accent)}
+.icon{border:0;background:transparent;color:var(--muted);width:40px;height:40px;border-radius:10px;font-size:1.15rem;line-height:1;flex:none}
+.icon:hover,.icon:focus-visible{background:var(--accent-soft);color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.alts{flex-basis:100%;display:flex;flex-direction:column;gap:6px;padding-left:calc(2.2ch + 12px)}
+.alts-label{font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.alt{display:flex;gap:10px;align-items:center;justify-content:space-between;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:8px 10px}
+.alt .main{font-size:.88rem}
+.alt button{font-size:.82rem;font-weight:600;border:1.5px solid var(--accent);color:var(--accent);background:var(--surface);border-radius:10px;padding:6px 10px;white-space:nowrap}
+.alt.chosen{border-color:var(--accent)}
+.picker{display:flex;flex-direction:column;gap:6px;background:var(--accent-soft);border-radius:12px;padding:10px}
+.picker select{flex:1;min-width:0;font:inherit;font-size:.88rem;padding:8px;border-radius:10px;border:1.5px solid var(--line);background:var(--surface);color:var(--fg)}
+.qtyin{width:4.5em;font:inherit;padding:8px;border-radius:10px;border:1.5px solid var(--line);background:var(--surface);color:var(--fg)}
+.picker .edit{flex-wrap:wrap}
+.confirmWrap{display:inline-flex;align-items:center;gap:6px;flex:none}
+.confirmQ{font-size:.8rem;font-weight:600;color:var(--accent);white-space:nowrap}
+.confirmWrap .yes,.confirmWrap .no{font-size:.8rem;font-weight:600;border-radius:8px;padding:6px 10px;min-height:32px}
+.confirmWrap .yes{border:0;background:var(--accent);color:var(--accent-fg)}
+.confirmWrap .no{border:1.5px solid var(--line);background:var(--surface);color:var(--fg)}
+details.alts>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:6px;padding:4px 0}
+details.alts>summary::-webkit-details-marker{display:none}
+details.alts>summary::before{content:"";width:6px;height:6px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(-45deg);transition:transform .15s}
+details.alts[open]>summary::before{transform:rotate(45deg)}
+.altGrid{display:flex;flex-direction:column;gap:8px;margin-top:6px}
+.altBtns{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.alt button.plus{border-color:var(--line);color:var(--fg)}
+.cartedit{flex-basis:100%;display:flex;flex-direction:column;gap:8px}
+.qtyrow{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:6px 8px}
+.qtyrow .prod{flex:1;min-width:0;font-size:.88rem}
+.qtyrow.gone .prod{text-decoration:line-through;color:var(--muted)}
+.step{width:36px;height:36px;border-radius:10px;border:1.5px solid var(--line);background:var(--bg);color:var(--fg);font-size:1.1rem;line-height:1;flex:none}
+.step:hover,.step:focus-visible{border-color:var(--accent);color:var(--accent)}
+.qtyval{min-width:2ch;text-align:center;font-weight:700;font-variant-numeric:tabular-nums}
+.lineRow{display:flex;align-items:center;gap:6px}
+.lineRow .prod{flex:1;min-width:0}
+.lineRow.gone .prod{text-decoration:line-through;color:var(--muted)}
+.mini{border:0;background:transparent;color:var(--muted);width:28px;height:28px;border-radius:8px;font-size:1rem;line-height:1;flex:none}
+.mini:hover,.mini:focus-visible{background:var(--accent-soft);color:var(--accent)}
+.why.pending{display:flex;gap:6px;align-items:baseline;flex-wrap:wrap}
+.why.pending .link{padding:0 2px}
+.empty{background:var(--surface);border:1.5px dashed var(--line);border-radius:16px;padding:18px;color:var(--muted)}
+.empty strong{color:var(--fg);display:block;margin-bottom:4px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:12px}
+.sec{scroll-margin-top:90px}
+.sec>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:6px 2px;border-radius:10px}
+.sec>summary::-webkit-details-marker{display:none}
+.sec>summary::before{content:"";width:8px;height:8px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(-45deg);transition:transform .15s;flex:none;margin-right:2px}
+.sec[open]>summary::before{transform:rotate(45deg)}
+.sec>summary h2{margin:0}
+.sec>.body{display:flex;flex-direction:column;gap:10px;margin-top:8px}
+.panel.sec>summary{padding:0}
+.sumline{font-size:.8rem;color:var(--muted)}
+.changes>summary{cursor:pointer;font-size:.85rem;font-weight:600;color:var(--fg)}
+ul.chg{margin-top:8px;background:var(--bg)}
+ul.chg li{padding:8px 12px;font-size:.88rem;gap:4px 10px}
+.tag{font-size:.68rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:2px 7px;border-radius:6px;white-space:nowrap;background:var(--line);color:var(--muted)}
+.tag.added{background:var(--ok-soft);color:var(--ok)} .tag.removed{background:var(--accent-soft);color:var(--accent)}
+.tag.swapped,.tag.replaced{background:var(--warn-soft);color:var(--warn)} .tag.not_found{background:var(--warn-soft);color:var(--warn)}
+.kv{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;font-size:.85rem}
+.kv dt{color:var(--muted)} .kv dd{margin:0;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.run{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.run+.run{margin-top:8px}
+.run>summary{cursor:pointer;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:.88rem}
+.run .body{margin-top:10px;display:flex;flex-direction:column;gap:10px}
+.st{font-weight:700} .st.ok{color:var(--ok)} .st.fail{color:var(--accent)} .st.run{color:var(--warn)}
+.log{margin:0;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px;font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere;max-height:420px;overflow:auto;color:var(--fg)}
+.pill.new{background:var(--line);color:var(--muted)}
+.prod{font-size:.85rem;color:var(--fg);overflow-wrap:anywhere}
+.actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.cartlink{font-weight:600;color:var(--fg);padding:10px 4px;text-decoration:underline;text-underline-offset:3px}
+.status{font-size:.85rem;color:var(--muted);margin:0}
+.toggle{font-size:.75rem;font-weight:600;border-radius:99px;padding:4px 10px;border:1.5px solid var(--line);background:transparent;color:var(--muted);white-space:nowrap}
+.toggle[aria-pressed=true]{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+.edit{flex-basis:100%;display:flex;gap:8px;align-items:center}
+.meta.full{flex-basis:100%}
+.struck .name{text-decoration:line-through;color:var(--muted)}
+.struck .qty{color:var(--muted)}
+li.editing{background:var(--accent-soft)}
+li.flash{box-shadow:inset 4px 0 0 var(--accent)}
+@media (prefers-reduced-motion:no-preference){li.flash{animation:flash 2.2s ease-out}@keyframes flash{0%,40%{background:var(--accent-soft)}100%{background:transparent}}}
+.banner{background:var(--warn-soft);color:var(--warn);padding:12px 14px;border-radius:12px;font-size:.9rem}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tabs a{font-size:.85rem;font-weight:600;color:var(--muted);text-decoration:none;padding:6px 12px;border-radius:99px;border:1px solid var(--line)}
+.tabs a:hover{color:var(--fg)}
+@media (prefers-reduced-motion:no-preference){li{animation:in .18s ease-out}@keyframes in{from{opacity:.4;transform:translateY(-3px)}}}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Inköpslistan</h1>
+    <span class="store">{{STORE_NAME}}</span>
+  </header>
+  <nav class="tabs" aria-label="Hoppa till">
+    <a href="#lista">Lista</a><a href="#onskemal">Preferenser</a><a href="#lardomar">Claudes lärdomar</a><a href="#bestallningar">Beställningar</a><a href="#devops" id="tabDevops" hidden>DevOps</a>
+  </nav>
+
+  <div id="banner" class="banner" hidden></div>
+
+  <div class="layout">
+  <div class="col-main">
+  <div class="addbar">
+    <form id="form" autocomplete="off">
+      <input type="text" id="item" aria-label="Ny vara" placeholder="t.ex. 2 avokado, mjölk 1,5%" enterkeyhint="done">
+      <button class="add" id="addBtn" type="submit">Lägg till</button>
+    </form>
+  </div>
+
+  <details class="sec" id="lista" open>
+    <summary><h2>Att handla <span class="count" id="c-all">0</span></h2><span class="sumline" id="sumline"></span></summary>
+    <div class="body">
+      <div id="list-all"></div>
+      <div class="actions" id="removingBar" hidden>
+        <span class="status" id="removingText"></span>
+        <button class="link" id="undoRemoving" type="button">Ångra</button>
+      </div>
+    </div>
+  </details>
+
+  </div>
+  <aside class="col-side">
+  <details class="sec panel" id="actionsPanel" open>
+    <summary><h2>Varukorgen</h2></summary>
+    <div class="body">
+    <p class="status" id="sync">Ingen synk än.</p>
+    <div class="actions" id="ownerActions" hidden>
+      <button class="add" id="syncBtn" type="button">Synka nu</button>
+    </div>
+    <p class="hint" id="actionMsg" hidden></p>
+    <p class="hint">Synken lägger till nya varor, följer era preferenser och letar erbjudanden och billigare likvärdiga varor för det som är nytt. Sedan betalar du själv hos ICA.</p>
+    <div class="actions">
+      <a class="cartlink" href="https://handlaprivatkund.ica.se/stores/{{STORE_ID}}/basket" target="_blank" rel="noopener">Öppna varukorgen hos ICA ↗</a>
+      <button class="link" id="orderedBtn" type="button" hidden>Jag har beställt</button>
+    </div>
+    <div class="actions" id="confirmOrdered" hidden>
+      <span class="status">Hämta din senaste beställning från ICA, spara den under Beställningar och töm det som beställts från listan?</span>
+      <button class="add" id="orderedYes" type="button">Ja, hämta</button>
+      <button class="link" id="orderedNo" type="button">Avbryt</button>
+    </div>
+    </div>
+  </details>
+
+  <details class="sec" id="onskemal" open>
+    <summary><h2>Preferenser <span class="count" id="c-prefs">0</span></h2></summary>
+    <div class="body">
+      <p class="hint" style="margin-top:0">"Helst" får bytas mot något billigare likvärdigt. "Alltid" byts aldrig.</p>
+      <form id="prefForm" autocomplete="off">
+        <input type="text" id="pref" aria-label="Ny preferens" placeholder="t.ex. Mjölk = Garant 1,5%">
+        <button class="add" id="prefBtn" type="submit">Spara</button>
+      </form>
+      <div id="list-prefs"></div>
+    </div>
+  </details>
+
+  <details class="sec" id="bestallningar">
+    <summary><h2>Beställningar <span class="count" id="c-orders">0</span></h2></summary>
+    <div class="body">
+      <div id="orderList"></div>
+    </div>
+  </details>
+
+  <details class="sec" id="devops" hidden>
+    <summary><h2>DevOps</h2><span class="sumline" id="devline"></span></summary>
+    <div class="body">
+      <div class="panel">
+        <div class="kv" id="taskState"><span class="status">Loading status…</span></div>
+        <div class="actions">
+          <button class="ghost" id="refreshTask" type="button">Refresh</button>
+          <button class="link" id="cancelRun" type="button" hidden>Cancel scheduled run</button>
+        </div>
+      </div>
+      <h2>Runs</h2>
+      <div id="runList"></div>
+    </div>
+  </details>
+
+  <details class="sec" id="lardomar" open>
+    <summary><h2>Claudes lärdomar <span class="count" id="c-learn">0</span></h2></summary>
+    <div class="body">
+      <div id="list-learn"></div>
+    </div>
+  </details>
+  </aside>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const TASK_ID = "{{TASK_ID}}";
+let db=null, user=null, mcp=null, myId=null, isOwner=false;
+let items=[], prefs=[], learns=[], names={}, editing=null;
+
+function parse(text){
+  const t=text.trim().replace(/\s+/g," ");
+  const m=t.match(/^(\d+(?:[.,]\d+)?)\s*(st|x)?\s+(.+)$/i);
+  return m ? {qty:Number(m[1].replace(",",".")), name:m[3]} : {qty:1, name:t};
+}
+function when(iso){
+  if(!iso) return "";
+  const d=new Date(iso), now=new Date();
+  const t=d.toLocaleTimeString("sv-SE",{hour:"2-digit",minute:"2-digit"});
+  return d.toDateString()===now.toDateString() ? "idag "+t : d.toLocaleDateString("sv-SE",{weekday:"short",day:"numeric",month:"short"})+" "+t;
+}
+const kr = n => (typeof n==="number" && isFinite(n)) ? n.toLocaleString("sv-SE",{minimumFractionDigits:2,maximumFractionDigits:2})+" kr" : "";
+function who(id){ if(!id) return "Någon"; if(id===myId) return "Du"; return names[id]||"Någon"; }
+function el(tag, cls, text){ const e=document.createElement(tag); if(cls) e.className=cls; if(text!=null) e.textContent=text; return e; }
+function iconBtn(label, sym, fn){ const b=el("button","icon",sym); b.type="button"; b.setAttribute("aria-label",label); b.onclick=fn; return b; }
+// Two-step removal: × turns into "Ta bort? Ja / Nej" in place; reverts by itself after 5 s.
+function confirmBtn(label, onYes, cls){
+  const wrap=el("span","confirmWrap");
+  const x=el("button",cls||"icon","×"); x.type="button"; x.setAttribute("aria-label",label);
+  wrap.append(x);
+  let timer=null;
+  const reset=()=>{ clearTimeout(timer); wrap.replaceChildren(x); };
+  x.onclick=()=>{
+    const q=el("span","confirmQ","Ta bort?");
+    const yes=el("button","yes","Ja"); yes.type="button"; yes.setAttribute("aria-label","Ja, "+label.toLowerCase());
+    const no=el("button","no","Nej"); no.type="button";
+    yes.onclick=()=>{ clearTimeout(timer); onYes(); };
+    no.onclick=reset;
+    wrap.replaceChildren(q,yes,no); yes.focus();
+    timer=setTimeout(reset,5000);
+  };
+  return wrap;
+}
+function showBanner(t){ const b=$("banner"); b.textContent=t; b.hidden=!t; }
+function actionMsg(t){ const m=$("actionMsg"); m.textContent=t; m.hidden=!t; }
+async function write(p){ try{ await p; }catch(e){ showBanner(e&&e.code==="invalid_argument" ? "Du har bara läsrätt. Be {{OWNER_NAME}} ge dig behörigheten Contributor." : "Kunde inte spara. Försök igen."); } }
+
+let editingItem=null, editDraft=null, pendingFocus=null;
+// Any change to the preference list bumps meta/prefs.changedAt, so the sync can skip re-checking items checked after that.
+async function touchPrefs(){ if(db) await write(db.doc("meta/prefs").set({changedAt:new Date().toISOString(), changedBy:myId})); }
+const asText = it => (it.qty>1 ? it.qty+" " : "") + (it.name||"");
+
+function startEdit(it){ editingItem=it.id; editDraft=null; pendingFocus=it.id; renderItems(); }
+
+// Editing a cart item opens an editor on the row itself: the list text plus a quantity per product.
+// Nothing is written until Spara. Only quantities changed -> qtyChanges on the item. Text changed -> replacement item (old flow).
+let cartEdit=null; // {id, text, qtys:{product:qty}}
+function editFromCart(it){
+  const q={}; linesOf(it).forEach(l=>{ q[l.product]=pendingQty(it,l); });
+  cartEdit={id:it.id, text:asText(it), qtys:q}; pendingFocus=it.id; renderItems();
+}
+function pendingQty(it,l){ const c=(Array.isArray(it.qtyChanges)?it.qtyChanges:[]).find(x=>x.product===l.product); return c ? c.qty : (l.qty||1); }
+async function saveCartEdit(it){
+  const ce=cartEdit; if(!ce) return;
+  const v=ce.text.trim();
+  if(v && v!==asText(it)){
+    // List text changed: replace via a new item (synced as a new pick), original goes out at next sync.
+    try{
+      const {qty,name}=parse(v);
+      const ref = await db.collection("items").add({name, qty, status:"new", replacesId:it.id, editSaved:true, sortAt:(it.sortAt||it.addedAt||"")+"~", addedBy:myId, addedAt:new Date().toISOString()});
+      await db.doc("items/"+it.id).update({removeRequested:true, replacedBy:ref.id});
+    }catch(e){ showBanner("Kunde inte spara ändringen. Försök igen."); return; }
+  } else {
+    const changes=linesOf(it).filter(l=>ce.qtys[l.product]!==(l.qty||1)).map(l=>({product:l.product, from:l.qty||1, qty:ce.qtys[l.product]}));
+    await write(db.doc("items/"+it.id).update({qtyChanges:changes}));
+  }
+  cartEdit=null; renderItems();
+}
+function cartEditRow(it){
+  const li=el("li","editing"); li.id="row-"+it.id;
+  const box=el("form","cartedit");
+  const inp=document.createElement("input"); inp.type="text"; inp.id="edit-item-"+it.id; inp.value=cartEdit.text; inp.setAttribute("aria-label","Text på listan");
+  inp.oninput=()=>{ cartEdit.text=inp.value; };
+  box.append(el("span","alts-label","På listan"), inp);
+  const lines=linesOf(it);
+  if(lines.length){
+    box.append(el("span","alts-label","Antal i varukorgen"));
+    lines.forEach(l=>{
+      const row=el("div","qtyrow");
+      const name=el("span","prod", l.product + (typeof l.price==="number" && (l.qty||1)>0 ? " · "+kr(l.price/(l.qty||1))+"/st" : ""));
+      const minus=el("button","step","−"); minus.type="button"; minus.setAttribute("aria-label","Minska antal "+l.product);
+      const val=el("span","qtyval", String(cartEdit.qtys[l.product]));
+      const plus=el("button","step","+"); plus.type="button"; plus.setAttribute("aria-label","Öka antal "+l.product);
+      const setQ=n=>{ cartEdit.qtys[l.product]=Math.max(0,Math.min(99,n)); val.textContent=String(cartEdit.qtys[l.product]); row.classList.toggle("gone", cartEdit.qtys[l.product]===0); };
+      minus.onclick=()=>setQ(cartEdit.qtys[l.product]-1); plus.onclick=()=>setQ(cartEdit.qtys[l.product]+1);
+      row.append(name, minus, val, plus); setQ(cartEdit.qtys[l.product]);
+      box.append(row);
+    });
+    box.append(el("p","hint","Ändrar du texten väljs varan om från början. Ändrar du bara antal behålls samma produkter. 0 tar bort produkten."));
+  }
+  const acts=el("div","actions");
+  const s=el("button","add","Spara"); s.type="submit";
+  const c=el("button","link","Avbryt"); c.type="button"; c.onclick=()=>{ cartEdit=null; renderItems(); };
+  acts.append(s,c); box.append(acts);
+  box.onsubmit=e=>{ e.preventDefault(); saveCartEdit(it); };
+  li.append(box);
+  return li;
+}
+async function deleteItem(it){
+  await write(db.doc("items/"+it.id).delete());
+  if(it.replacesId) await write(db.doc("items/"+it.replacesId).update({removeRequested:false, replacedBy:null}));
+}
+async function undoRemove(it){
+  await write(db.doc("items/"+it.id).update({removeRequested:false, replacedBy:null}));
+  if(it.replacedBy){ if(editingItem===it.replacedBy) editingItem=null; await write(db.doc("items/"+it.replacedBy).delete()); }
+}
+
+// An in_cart item can hold several products (e.g. "3 olika pajer"): lines = [{product, qty, price}].
+function linesOf(it){
+  if(Array.isArray(it.lines) && it.lines.length) return it.lines;
+  return it.product ? [{product:it.product, qty:it.qty||1, price:it.price}] : [];
+}
+let picker=null;
+const openAlts=new Set(); // item ids whose Alternativ section is expanded (survives re-renders)
+function pickerEl(it, alt, lines, swaps){
+  const box=el("form","picker");
+  box.append(el("span","alts-label","Byt ut vilken?"));
+  const sel=document.createElement("select"); sel.id="pick-line-"+it.id; sel.setAttribute("aria-label","Vilken produkt ska bytas");
+  lines.forEach((l,i)=>{ const already=swaps.filter(s=>s.from===l.product).reduce((n,s)=>n+(s.qty||1),0); const left=(l.qty||1)-already; const o=document.createElement("option"); o.value=String(i); o.textContent=(l.qty>1?l.qty+"× ":"")+l.product+(left<(l.qty||1)?" ("+left+" kvar)":""); o.disabled=left<=0; sel.append(o); });
+  const qty=document.createElement("input"); qty.type="number"; qty.min="1"; qty.value="1"; qty.id="pick-qty-"+it.id; qty.setAttribute("aria-label","Antal att byta"); qty.className="qtyin";
+  const syncMax=()=>{ const l=lines[+sel.value]; const already=swaps.filter(s=>s.from===l.product).reduce((n,s)=>n+(s.qty||1),0); const max=Math.max(1,(l.qty||1)-already); qty.max=String(max); if(+qty.value>max) qty.value=String(max); qty.disabled = max<=1; };
+  sel.onchange=syncMax; syncMax();
+  const ok=el("button","add","Byt"); ok.type="submit";
+  const no=el("button","link","Avbryt"); no.type="button"; no.onclick=()=>{ picker=null; renderItems(); };
+  const row=el("div","edit"); row.append(sel, el("span","meta","antal"), qty, ok, no);
+  box.append(row);
+  box.onsubmit=async e=>{
+    e.preventDefault();
+    const l=lines[+sel.value]; const n=Math.max(1, Math.min(+qty.value||1, +qty.max||1));
+    picker=null;
+    await write(db.doc("items/"+it.id).update({swaps:[...swaps, {from:l.product, to:alt.product, qty:n}], swapTo:null}));
+    renderItems();
+  };
+  return box;
+}
+
+function itemEditRow(it){
+  const li=el("li","editing"); li.id="row-"+it.id;
+  const f=el("form","edit");
+  const inp=document.createElement("input"); inp.type="text"; inp.id="edit-item-"+it.id;
+  inp.value = editDraft!=null ? editDraft : asText(it); inp.setAttribute("aria-label","Ändra vara");
+  inp.oninput=()=>{ editDraft=inp.value; };
+  const s=el("button","add","Spara"); s.type="submit";
+  // Avbryt: close without saving. A cart-edit copy that was never saved is undone entirely (original stays in the cart).
+  const c=el("button","link","Avbryt"); c.type="button";
+  c.onclick=async()=>{ editingItem=null; editDraft=null; if(it.replacesId && !it.editSaved) await deleteItem(it); renderItems(); };
+  f.append(inp,s,c);
+  f.onsubmit=async e=>{
+    e.preventDefault(); const v=inp.value.trim(); if(!v) return;
+    const {qty,name}=parse(v);
+    await write(db.doc("items/"+it.id).update({name, qty, status:"new", syncNote:null, editSaved:true}));
+    editingItem=null; editDraft=null; renderItems();
+  };
+  li.append(f);
+  if(it.replacesId) li.append(el("div","meta full","Ersätter varan i varukorgen vid nästa synk."));
+  return li;
+}
+
+// Phone-friendly row: top line = qty · name + status chip · actions; everything else full width underneath.
+function itemRow(it){ return layoutRow(itemRowRaw(it)); }
+function layoutRow(li){
+  if(li.classList.contains("editing")) return li;
+  const main=li.querySelector(":scope > .main"); if(!main) return li;
+  const qty=li.querySelector(":scope > .qty");
+  const name=main.querySelector(":scope > .name");
+  const sub=el("div","sub");
+  [...main.children].filter(c=>c!==name).forEach(c=>sub.append(c));
+  const title=el("div","title");
+  if(name) title.append(name);
+  const pill=li.querySelector(":scope > .pill"); if(pill) title.append(pill);
+  main.replaceChildren(title);
+  const acts=el("div","acts");
+  [...li.children].filter(c=>c.matches("button, .confirmWrap")).forEach(c=>acts.append(c));
+  const alts=li.querySelector(":scope > details.alts"); if(alts) sub.append(alts);
+  li.replaceChildren(...[qty, main, acts].filter(Boolean));
+  if(sub.childElementCount) li.append(sub);
+  li.classList.add("row2");
+  return li;
+}
+function itemRowRaw(it){
+  if(editingItem===it.id) return itemEditRow(it);
+  if(cartEdit && cartEdit.id===it.id) return cartEditRow(it);
+  const li=el("li", it.removeRequested ? "struck" : null); li.id="row-"+it.id;
+  li.append(el("span","qty", it.qty>1 ? it.qty+"×" : ""));
+  const main=el("div","main");
+  main.append(el("div","name", it.name));
+  if(it.status==="in_cart" && it.removeRequested){
+    main.append(el("div","meta", it.replacedBy ? "Ersätts av den ändrade raden nedanför vid nästa synk." : "Tas bort ur varukorgen vid nästa synk."));
+    li.append(main);
+    li.append(el("span","pill warn", "Tas bort"));
+    if(db){ const u=el("button","toggle","Ångra"); u.type="button"; u.onclick=()=>undoRemove(it); li.append(u); }
+    return li;
+  }
+  if(it.status==="in_cart"){
+    const lines=linesOf(it);
+    const pend=Array.isArray(it.swaps)?it.swaps:[];
+    const multi = lines.length>1 || lines.some(l=>(l.qty||1)>1);
+    lines.forEach(l=>{
+      if(!l.product) return;
+      const used=pend.filter(s=>s.from===l.product).reduce((n,s)=>n+(s.qty||1),0);
+      const left=(l.qty||1)-used;
+      const row=el("div","lineRow"+(left<=0?" gone":""));
+      row.append(el("span","prod", (multi ? l.qty+"× " : "") + l.product + (typeof l.price==="number" ? " · "+kr(l.price) : "")));
+      if(db && multi && left>0){
+        row.append(confirmBtn("Ta bort en "+l.product, ()=>write(db.doc("items/"+it.id).update({swaps:[...pend, {from:l.product, to:null, qty:1}], swapTo:null})), "mini"));
+      }
+      main.append(row);
+    });
+    if(it.reason) main.append(el("div","meta", it.reason));
+    if(it.swapTo) main.append(el("div","why", "Byts till " + it.swapTo + " vid nästa synk."));
+    const qc=Array.isArray(it.qtyChanges)?it.qtyChanges:[];
+    if(qc.length){
+      const w=el("div","why pending");
+      w.append(el("span",null,"Antal ändras vid nästa synk: "+qc.map(c=>c.product+" "+c.from+" → "+c.qty+" st").join(", ")+" "));
+      if(db){ const u=el("button","link","Ångra"); u.type="button"; u.onclick=()=>write(db.doc("items/"+it.id).update({qtyChanges:[]})); w.append(u); }
+      main.append(w);
+    }
+    const adds=Array.isArray(it.adds)?it.adds:[];
+    adds.forEach((a,idx)=>{
+      const w=el("div","why pending");
+      w.append(el("span",null,"Läggs till vid nästa synk: "+(a.qty>1?a.qty+"× ":"")+a.product+" "));
+      if(db){ const u=el("button","link","Ångra"); u.type="button"; u.onclick=()=>write(db.doc("items/"+it.id).update({adds:adds.filter((_,j)=>j!==idx)})); w.append(u); }
+      main.append(w);
+    });
+    pend.forEach((s,idx)=>{
+      const w=el("div","why pending");
+      w.append(el("span",null, s.to ? "Byts vid nästa synk: "+(s.qty>1?s.qty+"× ":"")+s.from+" → "+s.to+" " : "Tas bort vid nästa synk: "+(s.qty>1?s.qty+"× ":"")+s.from+" "));
+      if(db){ const u=el("button","link","Ångra"); u.type="button"; u.onclick=()=>{ const next=pend.filter((_,j)=>j!==idx); write(db.doc("items/"+it.id).update({swaps:next})); }; w.append(u); }
+      main.append(w);
+    });
+  } else if(it.status==="not_found"){
+    main.append(el("div","meta", it.syncNote || "Ingen passande vara. Ändra och synka igen."));
+  } else {
+    main.append(el("div","meta", (it.replacesId ? "Ändrad · " : "") + who(it.addedBy)+" · "+when(it.addedAt)));
+  }
+  li.append(main);
+  if(it.status==="in_cart") li.append(el("span","pill ok","I varukorgen"));
+  else if(it.status==="not_found") li.append(el("span","pill warn","Hittades inte"));
+  else li.append(el("span","pill new","Ej tillagd"));
+  if(db && it.replacesId && it.status==="new"){
+    const u=el("button","toggle","Ångra ändring"); u.type="button"; u.title="Behåll den gamla varan i varukorgen"; u.onclick=()=>deleteItem(it); li.append(u);
+  }
+  if(db && it.status!=="in_cart"){
+    li.append(iconBtn("Ändra "+it.name,"✎",()=>startEdit(it)));
+    li.append(confirmBtn("Ta bort "+it.name, ()=>deleteItem(it)));
+  }
+  if(db && it.status==="in_cart"){
+    li.append(iconBtn("Ändra "+it.name,"✎",()=>editFromCart(it)));
+    li.append(confirmBtn("Ta bort "+it.name+" ur varukorgen", ()=>write(db.doc("items/"+it.id).update({removeRequested:true}))));
+  }
+  if(it.status==="in_cart" && Array.isArray(it.alternatives) && it.alternatives.length){
+    const box=el("details","alts");
+    box.open = openAlts.has(it.id) || (picker && picker.id===it.id);
+    box.addEventListener("toggle",()=>{ box.open ? openAlts.add(it.id) : openAlts.delete(it.id); });
+    const lines=linesOf(it);
+    const swaps=Array.isArray(it.swaps)?it.swaps:[];
+    const adds=Array.isArray(it.adds)?it.adds:[];
+    const picked=it.alternatives.filter(a=>swaps.some(s=>s.to===a.product)||adds.some(x=>x.product===a.product)).length;
+    box.append(el("summary","alts-label","Alternativ ("+it.alternatives.slice(0,3).length+")"+(picked?" · "+picked+" valt":"")));
+    const grid=el("div","altGrid"); box.append(grid);
+    it.alternatives.slice(0,3).forEach((a,ai)=>{
+      const swapped=swaps.filter(s=>s.to===a.product).reduce((n,s)=>n+(s.qty||1),0);
+      const added=adds.filter(x=>x.product===a.product).reduce((n,x)=>n+(x.qty||1),0);
+      const row=el("div","alt"+(swapped||added?" chosen":""));
+      const m=el("div","main");
+      m.append(el("div","name",a.product||""));
+      const sub=[a.price!=null?kr(a.price):"", a.note||"", swapped?("byts in för "+swapped+" st"):"", added?("läggs till "+added+" st"):""].filter(Boolean).join(" · ");
+      if(sub) m.append(el("div","meta",sub));
+      row.append(m);
+      if(db){
+        const btns=el("div","altBtns");
+        const sw=el("button",null,"Byt"); sw.type="button"; sw.title="Byt ut en vara mot denna";
+        const single = lines.length===1 && (lines[0].qty||1)===1;
+        sw.onclick=()=>{
+          if(single){ write(db.doc("items/"+it.id).update({swaps:[{from:lines[0].product, to:a.product, qty:1}], swapTo:null})); }
+          else { picker = (picker && picker.id===it.id && picker.ai===ai) ? null : {id:it.id, ai}; renderItems(); }
+        };
+        const ad=el("button","plus","+ Lägg till"); ad.type="button"; ad.title="Lägg till denna utöver det som redan ligger i korgen";
+        ad.onclick=()=>{
+          const i=adds.findIndex(x=>x.product===a.product);
+          const next = i>=0 ? adds.map((x,j)=>j===i?{...x, qty:(x.qty||1)+1}:x) : [...adds, {product:a.product, qty:1, price:a.price??null}];
+          write(db.doc("items/"+it.id).update({adds:next}));
+        };
+        btns.append(sw, ad); row.append(btns);
+      }
+      grid.append(row);
+      if(picker && picker.id===it.id && picker.ai===ai) grid.append(pickerEl(it, a, lines, swaps));
+    });
+    li.append(box);
+  }
+  return li;
+}
+function fill(boxId, arr, rowFn, emptyHtml){
+  const box=$(boxId); box.replaceChildren();
+  if(!arr.length){ if(emptyHtml){ const e=el("div","empty"); e.innerHTML=emptyHtml; box.append(e);} return; }
+  const ul=el("ul"); arr.forEach(x=>ul.append(rowFn(x))); box.append(ul);
+}
+
+async function resolveNames(){
+  const ids=[...new Set(items.map(i=>i.addedBy).filter(Boolean))].filter(id=>!(id in names));
+  if(user && ids.length){ try{ const ps=await user.profiles(ids); ids.forEach(id=>names[id]=(ps[id]&&ps[id].name)||""); }catch(e){} }
+}
+async function renderItems(){
+  await resolveNames();
+  const key=i=>i.sortAt||i.addedAt||"";
+  const removing=items.filter(i=>i.removeRequested);
+  const all=items.filter(i=>!i.removeRequested).sort((a,b)=>key(a).localeCompare(key(b)));
+  const rb=$("removingBar"); rb.hidden=!removing.length || !db;
+  $("removingText").textContent = removing.length===1 ? "1 vara tas bort ur varukorgen vid nästa synk." : removing.length+" varor tas bort ur varukorgen vid nästa synk.";
+  const cart=all.filter(i=>i.status==="in_cart" && !i.removeRequested);
+  const waiting=all.filter(i=>(i.status||"new")==="new").length;
+  const missing=all.filter(i=>i.status==="not_found").length;
+  $("c-all").textContent=all.filter(i=>!i.removeRequested).length;
+  const total=cart.reduce((s,i)=>s+(typeof i.price==="number"?i.price:0),0);
+  $("sumline").textContent=[cart.length?cart.length+" i varukorgen"+(total?" · "+kr(total):""):"", waiting?waiting+" ej tillagda":"", missing?missing+" hittades inte":""].filter(Boolean).join(" · ");
+  $("orderedBtn").hidden=!cart.length||!db||!mcp||!isOwner;
+  if(pendingFocus) $("lista").open=true;
+  fill("list-all", all, itemRow, "<strong>Listan är tom</strong>Skriv en vara i fältet ovan. Allt ni lägger till syns direkt för er båda.");
+  if(pendingFocus){
+    const row=$("row-"+pendingFocus);
+    if(row){
+      const id=pendingFocus; pendingFocus=null;
+      row.scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block:"center"});
+      row.classList.add("flash"); setTimeout(()=>row.classList.remove("flash"),2200);
+      const inp=$("edit-item-"+id); if(inp){ inp.focus({preventScroll:true}); inp.setSelectionRange(inp.value.length, inp.value.length); }
+    }
+  }
+}
+
+function prefRow(p){
+  const li=el("li");
+  if(editing===p.id){
+    const f=el("form","edit"); const inp=document.createElement("input"); inp.type="text"; inp.id="edit-"+p.id; inp.value=p.text; inp.setAttribute("aria-label","Ändra preferens");
+    const s=el("button","add","Spara"); s.type="submit";
+    const c=el("button","link","Avbryt"); c.type="button"; c.onclick=()=>{editing=null; renderPrefs();};
+    f.append(inp,s,c);
+    f.onsubmit=async e=>{ e.preventDefault(); const v=inp.value.trim(); if(!v) return; await write(db.doc("prefs/"+p.id).update({text:v, updatedAt:new Date().toISOString()})); await touchPrefs(); editing=null; renderPrefs(); };
+    li.append(f); setTimeout(()=>inp.focus(),0); return li;
+  }
+  const main=el("div","main"); main.append(el("div","name",p.text));
+  if(p.fromLearning) main.append(el("div","meta","Från Claudes lärdomar"));
+  li.append(main);
+  const t=el("button","toggle", p.strict ? "Alltid" : "Helst"); t.type="button"; t.setAttribute("aria-pressed", p.strict?"true":"false");
+  t.title="Växla mellan Helst och Alltid";
+  if(db) t.onclick=async()=>{ await write(db.doc("prefs/"+p.id).update({strict: !p.strict, updatedAt:new Date().toISOString()})); await touchPrefs(); };
+  li.append(t);
+  if(db){
+    li.append(iconBtn("Ändra "+p.text,"✎",()=>{editing=p.id; renderPrefs();}));
+    li.append(confirmBtn("Ta bort preferens "+p.text, async()=>{ await write(db.doc("prefs/"+p.id).delete()); await touchPrefs(); }));
+  }
+  return li;
+}
+function renderPrefs(){
+  $("c-prefs").textContent=prefs.length;
+  const sorted=prefs.slice().sort((a,b)=>(a.addedAt||"").localeCompare(b.addedAt||""));
+  fill("list-prefs", sorted, prefRow, "<strong>Inga preferenser än</strong>Skriv t.ex. \"Kaffe = Gevalia mellanrost\" eller \"Välj ekologiskt om det finns\". Claude föreslår också egna under Claudes lärdomar.");
+}
+
+function learnRow(l){
+  const li=el("li");
+  const main=el("div","main"); main.append(el("div","name",l.text));
+  const sub=[l.evidence, l.updatedAt?"uppdaterad "+when(l.updatedAt):""].filter(Boolean).join(" · ");
+  if(sub) main.append(el("div","meta",sub));
+  li.append(main);
+  if(db){
+    const b=el("button","toggle","Gör till preferens"); b.type="button";
+    b.onclick=async()=>{ await write(db.collection("prefs").add({text:l.suggestedPref||l.text, strict:false, fromLearning:true, addedBy:myId, addedAt:new Date().toISOString()})); await touchPrefs(); await write(db.doc("learnings/"+l.id).delete()); };
+    li.append(b);
+    li.append(confirmBtn("Glöm "+l.text, ()=>write(db.doc("learnings/"+l.id).delete())));
+  }
+  return li;
+}
+function renderLearns(){
+  $("c-learn").textContent=learns.length;
+  const sorted=learns.slice().sort((a,b)=>(b.updatedAt||"").localeCompare(a.updatedAt||""));
+  fill("list-learn", sorted, learnRow, "<strong>Inget än</strong>Claude noterar vad ni brukar välja, vilka alternativ ni byter till och vad ni ändrar i varukorgen. Det dyker upp här efter några synkar, och ni bestämmer vad som blir preferenser.");
+}
+
+$("form").addEventListener("submit", async e=>{
+  e.preventDefault(); const v=$("item").value; if(!v.trim()||!db) return;
+  const {qty,name}=parse(v); $("addBtn").disabled=true;
+  await write(db.collection("items").add({name, qty, status:"new", addedBy:myId, addedAt:new Date().toISOString()}).then(()=>{$("item").value="";}));
+  $("addBtn").disabled=false; $("item").focus();
+});
+$("prefForm").addEventListener("submit", async e=>{
+  e.preventDefault(); const v=$("pref").value.trim(); if(!v||!db) return;
+  $("prefBtn").disabled=true;
+  await write(db.collection("prefs").add({text:v, strict:false, addedBy:myId, addedAt:new Date().toISOString()}).then(()=>{$("pref").value="";}));
+  await touchPrefs();
+  $("prefBtn").disabled=false;
+});
+$("undoRemoving").onclick=async()=>{ for(const it of items.filter(i=>i.removeRequested)) await undoRemove(it); };
+$("orderedBtn").onclick=()=>{ $("confirmOrdered").hidden=false; $("orderedBtn").hidden=true; };
+$("orderedNo").onclick=()=>{ $("confirmOrdered").hidden=true; $("orderedBtn").hidden=false; };
+// "Jag har beställt": the run reads the actual placed order from ICA (incl. manual changes made there) and records that.
+$("orderedYes").onclick=async()=>{
+  $("confirmOrdered").hidden=true; $("orderedBtn").hidden=false;
+  await fire("ordered", $("orderedBtn"), "Jag har beställt");
+};
+
+async function fire(mode, btn, label){
+  if(!mcp) return;
+  $("syncBtn").disabled=true; $("orderedBtn").disabled=true; btn.textContent="Startar…"; actionMsg("");
+  try{
+    // Runs started by the scheduler get the PC attached; direct fires from a browser don't. So schedule a one-shot run at the next whole minute (≥30 s ahead).
+    const at = new Date(Math.ceil((Date.now()+30000)/60000)*60000);
+    await db.doc("meta/request").set({mode, requestedAt:new Date().toISOString(), runAt:at.toISOString(), status:"pending", requestedBy:myId});
+    await mcp.callTool("Claude Code Remote","update_trigger",{trigger_id:TASK_ID, run_once_at:at.toISOString().replace(/\.\d{3}Z$/,"Z"), enabled:true});
+    btn.textContent = "Startar "+at.toLocaleTimeString("sv-SE",{hour:"2-digit",minute:"2-digit"});
+    actionMsg((mode==="ordered" ?"Hämtningen av beställningen" : "Synken") + " startar ca " + at.toLocaleTimeString("sv-SE",{hour:"2-digit",minute:"2-digit"}) + " och tar några minuter. Följ den under DevOps.");
+    loadTask();
+    setTimeout(()=>{ $("syncBtn").disabled=false; $("orderedBtn").disabled=false; $("syncBtn").textContent="Synka nu"; $("orderedBtn").textContent="Jag har beställt"; },120000);
+  }catch(err){
+    $("syncBtn").disabled=false; $("orderedBtn").disabled=false; btn.textContent=label;
+    actionMsg(err&&err.code==="denied" ? "Tillåt Claude Code Remote för sidan för att kunna starta." : "Kunde inte starta. Kontrollera att datorn med Claude-appen är på och försök igen.");
+  }
+}
+// ---- orders ----
+let orders=[];
+async function readd(lines){
+  for(const l of lines) await write(db.collection("items").add({name:l.name, qty:l.qty||1, status:"new", addedBy:myId, addedAt:new Date().toISOString(), note:"Från tidigare beställning"}));
+  $("lista").open=true; $("lista").scrollIntoView({behavior:"smooth",block:"start"});
+}
+function renderOrders(){
+  $("c-orders").textContent=orders.length;
+  const box=$("orderList"); box.replaceChildren();
+  if(!orders.length){ const e=el("div","empty"); e.innerHTML="<strong>Inga beställningar än</strong>När du trycker Jag har beställt sparas varukorgen här, med produkter och priser."; box.append(e); return; }
+  orders.forEach(o=>{
+    const lines=Array.isArray(o.items)?o.items:[];
+    const d=el("details","run");
+    const s=el("summary");
+    s.append(el("span","name", new Date(o.orderedAt).toLocaleDateString("sv-SE",{weekday:"short",day:"numeric",month:"short",year:"numeric"})), el("span","meta", lines.length+" varor"+(o.total?" · "+kr(o.total):"")+(o.orderNumber?" · order "+o.orderNumber:"")+(o.source==="list"?" · från listan":"")));
+    d.append(s);
+    const body=el("div","body");
+    if(o.delivery) body.append(el("div","meta","Leverans: "+o.delivery));
+    const diffs=Array.isArray(o.diffs)?o.diffs:[];
+    if(diffs.length){ body.append(el("span","alts-label","Ändrat i ICA innan beställning ("+diffs.length+")")); const dl=el("ul","chg"); diffs.forEach(x=>{ const li=el("li"); li.append(el("div","meta",x)); dl.append(li); }); body.append(dl); }
+    const ul=el("ul","chg");
+    lines.forEach(l=>{
+      const li=el("li");
+      li.append(el("span","qty", l.qty>1?l.qty+"×":""));
+      const m=el("div","main"); m.append(el("div","name",l.name)); if(l.product) m.append(el("div","meta",l.product)); li.append(m);
+      if(typeof l.price==="number") li.append(el("span","price",kr(l.price)));
+      if(db){ const b=el("button","toggle","Lägg till igen"); b.type="button"; b.onclick=()=>readd([l]); li.append(b); }
+      ul.append(li);
+    });
+    body.append(ul);
+    if(db && lines.length){ const b=el("button","ghost","Lägg till allt igen"); b.type="button"; b.onclick=()=>readd(lines); body.append(b); }
+    d.append(body); box.append(d);
+  });
+}
+
+// ---- changelog + devops ----
+let runs=[], request=null, task=null, taskErr=null;
+const TAG={added:"Tillagd",removed:"Borttagen",swapped:"Bytt",replaced:"Ändrad",not_found:"Hittades inte",updated:"Uppdaterad"};
+const TAG_EN={added:"Added",removed:"Removed",swapped:"Swapped",replaced:"Replaced",not_found:"Not found",updated:"Updated"};
+function changeRow(c, en){
+  const li=el("li");
+  const T = en ? TAG_EN : TAG;
+  li.append(el("span","tag "+(c.type||""), T[c.type]||c.type||(en?"Change":"Ändring")));
+  const m=el("div","main");
+  m.append(el("div","name", c.item||""));
+  const parts=[];
+  if(c.from && c.to) parts.push(c.from+" → "+c.to);
+  else if(c.product) parts.push(c.product);
+  if(typeof c.price==="number") parts.push(kr(c.price));
+  if(c.note) parts.push(c.note);
+  if(parts.length) m.append(el("div","meta",parts.join(" · ")));
+  li.append(m); return li;
+}
+const dur=(a,b)=>{ if(!a||!b) return ""; const s=Math.round((new Date(b)-new Date(a))/1000); return s>=60? Math.floor(s/60)+"m"+String(s%60).padStart(2,"0")+"s" : s+"s"; };
+const whenEn = iso => iso ? new Date(iso).toLocaleString("en-GB",{weekday:"short",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit",second:"2-digit"}) : "";
+function statusEl(st){ const cls= st==="done"?"ok": st==="running"?"run":"fail"; return el("span","st "+cls, st==="done"?"✓ done": st==="running"?"● running": "✗ "+(st||"unknown")); }
+function renderRuns(){
+  const box=$("runList"); box.replaceChildren();
+  if(!runs.length){ const e=el("div","empty"); e.textContent="No runs logged yet. The next run will show up here."; box.append(e); return; }
+  const last=runs[0];
+  $("devline").textContent=(last.status==="done"?"✓":last.status==="running"?"●":"✗")+" "+(last.mode||"")+" · "+whenEn(last.startedAt);
+  runs.forEach((r,i)=>{
+    const d=el("details","run"); if(i===0) d.open = d.open || false;
+    const s=el("summary");
+    s.append(statusEl(r.status), el("span",null,(r.mode||"?")+" · "+whenEn(r.startedAt)),el("span","meta", [dur(r.startedAt,r.finishedAt), r.trigger, r.summary].filter(Boolean).join(" · ")));
+    d.append(s);
+    const body=el("div","body");
+    const kv=el("dl","kv");
+    [["Run id",r.id],["Session",r.sessionId],["Trigger",r.trigger],["Started",r.startedAt],["Finished",r.finishedAt],["Duration",dur(r.startedAt,r.finishedAt)],["Device",r.device],["Cart total",typeof r.cartTotal==="number"?kr(r.cartTotal):""],["Error",r.error]].forEach(([k,v])=>{ if(v){ kv.append(el("dt",null,k), el("dd",null,String(v))); } });
+    body.append(kv);
+    const ch=Array.isArray(r.changes)?r.changes:[];
+    if(ch.length){ body.append(el("span","alts-label","Changes ("+ch.length+")")); const ul=el("ul","chg"); ch.forEach(c=>ul.append(changeRow(c,true))); body.append(ul); }
+    const steps=Array.isArray(r.steps)?r.steps:[];
+    if(steps.length){ body.append(el("span","alts-label","Steps ("+steps.length+")")); body.append(el("pre","log", steps.map(x=>`${(x.t||"").slice(11,19)}  ${x.ok===false?"✗":"✓"} ${x.step}\n    ${x.detail||""}`).join("\n"))); }
+    d.append(body); box.append(d);
+  });
+}
+function renderTaskState(){
+  const box=$("taskState"); box.replaceChildren();
+  const rows=[];
+  if(request) rows.push(["Request", (request.status||"?")+" · "+(request.mode||"")+(request.runAt?" · scheduled "+whenEn(request.runAt):"")+(request.handledAt?" · handled "+whenEn(request.handledAt):"")+(request.runId?" · "+request.runId:"")]);
+  if(task){
+    rows.push(["Task", task.name||TASK_ID]);
+    rows.push(["Enabled", task.enabled ? "yes" : "no"+(task.ended_reason?" ("+task.ended_reason+")":"")]);
+    if(task.enabled && task.run_once_at) rows.push(["Next run", whenEn(task.run_once_at)]);
+    if(task.last_run) rows.push(["Last run", (task.last_run.status||"").replace("ROUTINE_RUN_STATUS_","").toLowerCase()+" · "+whenEn(task.last_run.fired_at)+(task.last_run.finished_at?" · "+dur(task.last_run.fired_at,task.last_run.finished_at):"")]);
+    if(task.last_run && task.last_run.session_id) rows.push(["Session", task.last_run.session_id]);
+    rows.push(["Model", (task.derived_state&&task.derived_state.model)||""]);
+    rows.push(["Approvals", (task.derived_state&&task.derived_state.permission_mode)||""]);
+  } else if(taskErr) rows.push(["Task", "could not load: "+taskErr]);
+  rows.push(["Task id", TASK_ID]);
+  const dl=el("dl","kv"); rows.forEach(([k,v])=>{ if(v){ dl.append(el("dt",null,k), el("dd",null,v)); } }); box.append(dl);
+  $("cancelRun").hidden = !(task && task.enabled && task.run_once_at);
+}
+function payloadOf(res){
+  let p=res && res.payload;
+  if(typeof p==="string"){ try{ p=JSON.parse(p); }catch(e){} }
+  if(p && !p.data && Array.isArray(p.content)){ const t=p.content.find(c=>c.type==="text"); if(t){ try{ p=JSON.parse(t.text); }catch(e){} } }
+  return p;
+}
+async function loadTask(){
+  if(!mcp){ taskErr="no connector"; renderTaskState(); return; }
+  try{
+    const res=await mcp.callTool("Claude Code Remote","list_triggers",{limit:20, include_completed:true},{cache:false});
+    const p=payloadOf(res); const list=(p&&p.data)||[];
+    task=list.find(t=>t.id===TASK_ID)||null; taskErr = task?null:"not found";
+  }catch(e){ taskErr=(e&&e.code)||"fel"; }
+  renderTaskState();
+}
+$("refreshTask").onclick=loadTask;
+$("cancelRun").onclick=async()=>{
+  try{ await mcp.callTool("Claude Code Remote","update_trigger",{trigger_id:TASK_ID, enabled:false}); if(request) await write(db.doc("meta/request").update({status:"cancelled"})); }catch(e){ showBanner("Could not cancel the scheduled run."); }
+  loadTask();
+};
+
+$("syncBtn").onclick=()=>fire("sync",$("syncBtn"),"Synka nu");
+
+document.querySelectorAll("details.sec").forEach(d=>{
+  try{ const v=localStorage.getItem("open-"+d.id); if(v!==null) d.open = v==="1"; }catch(e){}
+  d.addEventListener("toggle",()=>{ try{ localStorage.setItem("open-"+d.id, d.open?"1":"0"); }catch(e){} });
+});
+function openHash(){ const id=location.hash.slice(1); const d=id&&document.getElementById(id); if(d&&d.tagName==="DETAILS"){ d.open=true; d.scrollIntoView({block:"start"}); } }
+window.addEventListener("hashchange",openHash);
+document.querySelectorAll(".tabs a").forEach(a=>a.addEventListener("click",()=>{ const d=document.getElementById(a.getAttribute("href").slice(1)); if(d) d.open=true; }));
+openHash();
+
+renderItems(); renderPrefs(); renderLearns(); renderOrders();
+$("addBtn").disabled=true; $("prefBtn").disabled=true;
+
+(async()=>{
+  const c=window.claude;
+  if(!c||!c.use){ showBanner("Listan kan bara sparas när sidan öppnas i Claude."); return; }
+  [db,user]=await Promise.all([c.use("db"),c.use("user")]);
+  if(!db){ showBanner("Logga in på Claude för att se och ändra listan."); return; }
+  if(user){ try{ myId=await user.id(); }catch(e){} try{ isOwner=await user.isOwner(); }catch(e){} }
+  $("addBtn").disabled=false; $("prefBtn").disabled=false;
+  if(isOwner){
+    mcp=await c.use("mcp");
+    if(mcp) $("ownerActions").hidden=false; else actionMsg("Knapparna fungerar inte i den här vyn. Be Claude i chatten i stället.");
+  } else {
+    actionMsg("{{OWNER_NAME}} startar synk och genomgång. Det ni lägger till ligger kvar tills dess.");
+  }
+  renderItems(); renderPrefs(); renderLearns();
+  db.collection("items").onSnapshot(s=>{ items=s.docs.map(d=>({id:d.id,...d.data()})).filter(i=>i.status!=="ordered"); renderItems(); }, ()=>showBanner("Tappade kontakten med listan. Ladda om sidan."));
+  db.collection("prefs").onSnapshot(s=>{ prefs=s.docs.map(d=>({id:d.id,...d.data()})); if(!editing) renderPrefs(); }, ()=>{});
+  db.collection("learnings").onSnapshot(s=>{ learns=s.docs.map(d=>({id:d.id,...d.data()})); renderLearns(); }, ()=>{});
+  if(isOwner){
+    $("devops").hidden=false; $("tabDevops").hidden=false;
+    db.collection("runs").orderBy("startedAt","desc").limit(20).onSnapshot(s=>{ runs=s.docs.map(d=>({id:d.id,...d.data()})); renderRuns(); }, ()=>{});
+    db.doc("meta/request").onSnapshot(s=>{ request=s.exists?s.data():null; renderTaskState(); }, ()=>{});
+    loadTask();
+  }
+  db.collection("orders").orderBy("orderedAt","desc").limit(100).onSnapshot(s=>{ orders=s.docs.map(d=>({id:d.id,...d.data()})); renderOrders(); }, ()=>{});
+  db.doc("meta/sync").onSnapshot(s=>{
+    if(!s.exists) return;
+    const d=s.data();
+    $("sync").textContent="Senaste körning "+when(d.at)+(d.summary?" · "+d.summary:"");
+  }, ()=>{});
+})();
+</script>
