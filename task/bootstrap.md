@@ -10,7 +10,13 @@ Lives in Anthropic's scheduler (not editable from this repo). Kept here for refe
 - Notifications: push
 - Changing this prompt requires approval from a Claude chat linked to {{DEVICE_NAME}}.
 
-## Bootstrap prompt (verbatim)
+## Status: NOT IN USE
+
+Tested 2026-10-10: scheduled runs have no `add_repo` tool and no GitHub credentials, so cloning this private
+repo fails (`could not read Username for https://github.com`). The task therefore holds the full instructions
+from `agent/sync-instructions.md` (everything below its `---`). This bootstrap would work if the repo were public.
+
+## Bootstrap prompt (kept for reference)
 
 ```
 BOOTSTRAP — load the real instructions from GitHub, then follow them.

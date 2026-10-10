@@ -1,8 +1,9 @@
 # ICA shopping list sync — agent instructions
 
-**This file is the live agent logic.** Every sync run clones this repo (branch `master`) and follows
-this file. Changes pushed here take effect on the next run — no task update needed.
-The scheduled task itself only holds a fixed bootstrap: see `task/bootstrap.md`.
+**Source of truth for the agent logic.** The text below `---` is deployed verbatim as the prompt of the
+scheduled task "ICA shopping list sync". Scheduled runs can't read this private repo (no GitHub credentials
+in those sessions — tested 2026-10-10), so changes here take effect only after a deploy: ask Claude in a chat
+linked to {{DEVICE_NAME}} to "deploy the agent instructions from the repo".
 
 ⚠️ The agent runs with automatic approval in a browser logged into the household's ICA account.
 Anyone who can push to this repo controls it. Keep the repo private and push access limited.
