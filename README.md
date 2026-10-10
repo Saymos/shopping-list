@@ -11,6 +11,7 @@ Household-specific values (store, names, links, ids) are not in this repo — se
 | `page/inkopslistan.html` | Page source (UI). | Source of truth; deployed by publishing to the artifact (see below) |
 | `docs/data-model.md` | Database collections and fields. | Reference |
 | `task/bootstrap.md` | Scheduled task settings + an (unused) repo-bootstrap prompt. | Reference |
+| `task/keepalive.md` | Hourly ICA login check-in (scheduled task "ICA login keepalive"). | Deployed copy lives in the task |
 | `config.example.md` | The private CONFIG block, with placeholder values. | Template |
 
 ## Parts and where they run

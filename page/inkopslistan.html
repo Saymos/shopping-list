@@ -192,6 +192,7 @@ li.flash{box-shadow:inset 4px 0 0 var(--accent)}
   </nav>
 
   <div id="banner" class="banner" hidden></div>
+  <div id="icaLogin" class="banner" hidden></div>
 
   <div class="layout">
   <div class="col-main">
@@ -748,7 +749,15 @@ function renderOrders(){
 }
 
 // ---- changelog + devops ----
-let runs=[], request=null, task=null, taskErr=null;
+let runs=[], request=null, task=null, taskErr=null, session=null;
+// ICA login state, written hourly by the "ICA login keepalive" task.
+function renderSession(){
+  const b=$("icaLogin");
+  if(session && session.loggedIn===false){
+    b.textContent="ICA har loggat ut"+(session.loggedOutSince?" ("+when(session.loggedOutSince)+")":"")+". Synken fungerar inte förrän "+ownerName()+" loggar in igen: Claude-appen på datorn → Ctrl+Shift+B → BankID.";
+    b.hidden=false;
+  } else b.hidden=true;
+}
 const TAG={added:"Tillagd",removed:"Borttagen",swapped:"Bytt",replaced:"Ändrad",not_found:"Hittades inte",updated:"Uppdaterad"};
 const TAG_EN={added:"Added",removed:"Removed",swapped:"Swapped",replaced:"Replaced",not_found:"Not found",updated:"Updated"};
 function changeRow(c, en){
@@ -803,6 +812,12 @@ function renderTaskState(){
     rows.push(["Approvals", (task.derived_state&&task.derived_state.permission_mode)||""]);
   } else if(taskErr) rows.push(["Task", "could not load: "+taskErr]);
   rows.push(["Task id", TASK_ID||"(missing in meta/config)"]);
+  if(session){
+    rows.push(["ICA login", (session.loggedIn===true?"logged in":session.loggedIn===false?"LOGGED OUT"+(session.loggedOutSince?" since "+whenEn(session.loggedOutSince):""):"unknown")+(session.restored?" (restored)":"")+" · checked "+whenEn(session.checkedAt)]);
+    if(session.lastLoggedInAt) rows.push(["Last seen logged in", whenEn(session.lastLoggedInAt)]);
+    if(session.detail) rows.push(["Login check", session.detail]);
+    if(Array.isArray(session.history) && session.history.length) rows.push(["Login history", session.history.slice(0,12).map(h=>whenEn(h.t)+" "+(h.loggedIn===true?(h.restored?"↺":"✓"):h.loggedIn===false?"✗":"?")).join(" · ")]);
+  } else rows.push(["ICA login", "no keepalive check yet"]);
   rows.push(["Config", CFG.storeId ? "store "+CFG.storeId+" · device "+(CFG.deviceName||"?")+(CFG.updatedAt?" · updated "+whenEn(CFG.updatedAt):"") : "meta/config missing"]);
   const dl=el("dl","kv"); rows.forEach(([k,v])=>{ if(v){ dl.append(el("dt",null,k), el("dd",null,v)); } }); box.append(dl);
   $("cancelRun").hidden = !(task && task.enabled && task.run_once_at);
@@ -874,6 +889,7 @@ $("addBtn").disabled=true; $("prefBtn").disabled=true;
     loadTask();
   }
   db.collection("orders").orderBy("orderedAt","desc").limit(100).onSnapshot(s=>{ orders=s.docs.map(d=>({id:d.id,...d.data()})); renderOrders(); }, ()=>{});
+  db.doc("meta/session").onSnapshot(s=>{ session=s.exists?s.data():null; renderSession(); if(isOwner) renderTaskState(); }, ()=>{});
   db.doc("meta/sync").onSnapshot(s=>{
     if(!s.exists) return;
     const d=s.data();
