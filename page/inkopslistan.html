@@ -106,6 +106,8 @@ li.row2 .toggle{white-space:nowrap}
 .alt button{font-size:.82rem;font-weight:600;border:1.5px solid var(--accent);color:var(--accent);background:var(--surface);border-radius:10px;padding:6px 10px;white-space:nowrap}
 .alt.chosen{border-color:var(--accent)}
 .picker{display:flex;flex-direction:column;gap:6px;background:var(--accent-soft);border-radius:12px;padding:10px}
+.sortbar{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin:0 2px 8px;font-size:.85rem;color:var(--muted)}
+.sortbar select{font:inherit;font-size:.88rem;padding:6px 8px;border-radius:10px;border:1.5px solid var(--line);background:var(--surface);color:var(--fg);min-height:36px}
 .picker select{flex:1;min-width:0;font:inherit;font-size:.88rem;padding:8px;border-radius:10px;border:1.5px solid var(--line);background:var(--surface);color:var(--fg)}
 .qtyin{width:4.5em;font:inherit;padding:8px;border-radius:10px;border:1.5px solid var(--line);background:var(--surface);color:var(--fg)}
 .picker .edit{flex-wrap:wrap}
@@ -206,6 +208,14 @@ li.flash{box-shadow:inset 4px 0 0 var(--accent)}
   <details class="sec" id="lista" open>
     <summary><h2>Att handla <span class="count" id="c-all">0</span></h2><span class="sumline" id="sumline"></span></summary>
     <div class="body">
+      <div class="sortbar"><label for="sortSel">Sortera</label>
+        <select id="sortSel">
+          <option value="added">I tur och ordning</option>
+          <option value="newest">Senast tillagda först</option>
+          <option value="az">A–Ö</option>
+          <option value="status">Ej i varukorgen först</option>
+          <option value="price">Dyrast först</option>
+        </select></div>
       <div id="list-all"></div>
       <div class="actions" id="removingBar" hidden>
         <span class="status" id="removingText"></span>
@@ -597,11 +607,29 @@ async function resolveNames(){
   const ids=[...new Set(items.map(i=>i.addedBy).filter(Boolean))].filter(id=>!(id in names));
   if(user && ids.length){ try{ const ps=await user.profiles(ids); ids.forEach(id=>names[id]=(ps[id]&&ps[id].name)||""); }catch(e){} }
 }
+// List sorting (per viewer, remembered in this browser).
+let sortMode="added";
+try{ const v=localStorage.getItem("sortMode"); if(v) sortMode=v; }catch(e){}
+const STATUS_ORDER={not_found:0,new:1,in_cart:2};
+function sortFn(mode){
+  const added=i=>i.sortAt||i.addedAt||"";
+  const byAdded=(a,b)=>added(a).localeCompare(added(b));
+  const name=i=>(i.name||"").toLocaleLowerCase("sv");
+  switch(mode){
+    case "newest": return (a,b)=>-byAdded(a,b);
+    case "az": return (a,b)=>name(a).localeCompare(name(b),"sv")||byAdded(a,b);
+    case "status": return (a,b)=>(STATUS_ORDER[a.status||"new"]??1)-(STATUS_ORDER[b.status||"new"]??1)||byAdded(a,b);
+    case "price": { const p=i=>typeof i.price==="number"?i.price:-1; return (a,b)=>p(b)-p(a)||byAdded(a,b); }
+    default: return byAdded;
+  }
+}
+$("sortSel").value=sortMode; if($("sortSel").value!==sortMode){ sortMode="added"; $("sortSel").value="added"; }
+$("sortSel").onchange=e=>{ sortMode=e.target.value; try{ localStorage.setItem("sortMode",sortMode); }catch(err){} renderItems(); };
+
 async function renderItems(){
   await resolveNames();
-  const key=i=>i.sortAt||i.addedAt||"";
   const removing=items.filter(i=>i.removeRequested);
-  const all=items.filter(i=>!i.removeRequested).sort((a,b)=>key(a).localeCompare(key(b)));
+  const all=items.filter(i=>!i.removeRequested).sort(sortFn(sortMode));
   const rb=$("removingBar"); rb.hidden=!removing.length || !db;
   $("removingText").textContent = removing.length===1 ? "1 vara tas bort ur varukorgen vid nästa synk." : removing.length+" varor tas bort ur varukorgen vid nästa synk.";
   const cart=all.filter(i=>i.status==="in_cart" && !i.removeRequested);
