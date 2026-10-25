@@ -35,6 +35,9 @@ List entries. Written by the page (household) and the agent.
 ## orders/{id}
 `{orderedAt, orderNumber, delivery, total, source:"ica"|"list", items:[{name, qty, product, price}], diffs:[string]}` — created only by the agent in `ordered` mode. Never modified.
 
+## messages/{id}
+`{text, kind:"info"|"question", topic, itemId?, itemName?, options?, runId, createdAt, updatedAt, answer?, answeredAt?, answeredBy?, dismissedAt?, dismissedBy?, resolvedAt?, resolution?}` — the agent talks to the household ("Från Claude" on the page). The page writes `answer` (null = withdrawn) and `dismissedAt`; the agent applies answers at the next sync and sets `resolvedAt`. Deleted 14 days after resolved/dismissed.
+
 ## runs/{YYYYMMDD-HHMMSS}
 `{startedAt, finishedAt, status:"running"|"done"|"failed", mode, trigger, sessionId, device, cartTotal, summary, error, steps:[{t, step, ok, detail}], changes:[...]}` — max 20 kept.
 
@@ -46,4 +49,4 @@ List entries. Written by the page (household) and the agent.
 - `meta/config` `{storeId, storeName, ownerName, taskId, deviceName, updatedAt}` — household-specific values the page needs. Written only by the sync agent from the task's CONFIG block (master copy).
 
 ## change entry
-`{type:"added"|"removed"|"swapped"|"replaced"|"not_found"|"updated", item, product?, from?, to?, qty?, price?, note?}`
+`{type:"added"|"removed"|"swapped"|"replaced"|"not_found"|"updated"|"merged", item, product?, from?, to?, qty?, price?, note?}`

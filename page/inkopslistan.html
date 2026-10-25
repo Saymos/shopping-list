@@ -106,6 +106,19 @@ li.row2 .toggle{white-space:nowrap}
 .alt button{font-size:.82rem;font-weight:600;border:1.5px solid var(--accent);color:var(--accent);background:var(--surface);border-radius:10px;padding:6px 10px;white-space:nowrap}
 .alt.chosen{border-color:var(--accent)}
 .picker{display:flex;flex-direction:column;gap:6px;background:var(--accent-soft);border-radius:12px;padding:10px}
+.msgs{margin:6px 0 16px}
+.msgs h2{margin-bottom:8px}
+.msgs li{display:block}
+.msg.q{box-shadow:inset 3px 0 0 var(--accent)}
+.msg .txt{margin:0}
+.msg .meta{font-size:.8rem;color:var(--muted);margin-top:4px}
+.msg .answered{font-size:.88rem;color:var(--ok);margin-top:6px}
+.opts{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.opt{border:1.5px solid var(--line);background:var(--surface);color:var(--fg);border-radius:99px;padding:6px 12px;font:inherit;font-size:.88rem;min-height:36px}
+.opt:hover{border-color:var(--accent)}
+.reply{display:flex;gap:6px;margin-top:8px}
+.reply input[type=text]{padding:8px 12px;font-size:.9rem}
+.reply .add{min-height:36px;padding:0 14px;font-size:.9rem}
 .sortbar{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin:0 2px 8px;font-size:.85rem;color:var(--muted)}
 .sortbar select{font:inherit;font-size:.88rem;padding:6px 8px;border-radius:10px;border:1.5px solid var(--line);background:var(--surface);color:var(--fg);min-height:36px}
 .picker select{flex:1;min-width:0;font:inherit;font-size:.88rem;padding:8px;border-radius:10px;border:1.5px solid var(--line);background:var(--surface);color:var(--fg)}
@@ -204,6 +217,11 @@ li.flash{box-shadow:inset 4px 0 0 var(--accent)}
       <button class="add" id="addBtn" type="submit">Lägg till</button>
     </form>
   </div>
+
+  <section class="msgs" id="msgs" hidden aria-labelledby="msgsTitle">
+    <h2 id="msgsTitle">Från Claude <span class="count" id="c-msgs">0</span></h2>
+    <div id="msgList"></div>
+  </section>
 
   <details class="sec" id="lista" open>
     <summary><h2>Att handla <span class="count" id="c-all">0</span></h2><span class="sumline" id="sumline"></span></summary>
@@ -626,6 +644,45 @@ function sortFn(mode){
 $("sortSel").value=sortMode; if($("sortSel").value!==sortMode){ sortMode="added"; $("sortSel").value="added"; }
 $("sortSel").onchange=e=>{ sortMode=e.target.value; try{ localStorage.setItem("sortMode",sortMode); }catch(err){} renderItems(); };
 
+// Messages from the sync agent: info notes and questions the household can answer.
+let msgs=[];
+function msgRow(m){
+  const li=el("li","msg"+(m.kind==="question"?" q":""));
+  li.append(el("p","txt",m.text||""));
+  li.append(el("div","meta",[m.itemName, when(m.updatedAt||m.createdAt)].filter(Boolean).join(" · ")));
+  if(m.kind==="question"){
+    if(m.answer){
+      const a=el("div","answered","Ert svar: "+m.answer+" · används vid nästa synk ");
+      const ch=el("button","link","Ändra"); ch.type="button";
+      ch.onclick=()=>write(db.doc("messages/"+m.id).update({answer:null, answeredAt:null, answeredBy:null}));
+      a.append(ch); li.append(a);
+    } else {
+      const answer=v=>{ v=(v||"").trim(); if(v) write(db.doc("messages/"+m.id).update({answer:v, answeredAt:new Date().toISOString(), answeredBy:myId})); };
+      if(Array.isArray(m.options) && m.options.length){
+        const o=el("div","opts");
+        m.options.forEach(t=>{ const b=el("button","opt",t); b.type="button"; b.onclick=()=>answer(t); o.append(b); });
+        li.append(o);
+      }
+      const f=el("form","reply"); const inp=document.createElement("input"); inp.type="text"; inp.placeholder="Eller skriv ett svar"; inp.setAttribute("aria-label","Svar till Claude");
+      const sb=el("button","add","Svara"); sb.type="submit"; f.append(inp,sb);
+      f.onsubmit=e=>{ e.preventDefault(); answer(inp.value); };
+      li.append(f);
+    }
+  } else {
+    const ok=el("button","link","Okej, ta bort"); ok.type="button";
+    ok.onclick=()=>write(db.doc("messages/"+m.id).update({dismissedAt:new Date().toISOString(), dismissedBy:myId}));
+    li.append(ok);
+  }
+  return li;
+}
+function renderMsgs(){
+  const open=msgs.filter(m=>!m.resolvedAt && !m.dismissedAt)
+    .sort((a,b)=>((a.kind==="question"&&!a.answer)?0:1)-((b.kind==="question"&&!b.answer)?0:1) || String(b.updatedAt||b.createdAt||"").localeCompare(String(a.updatedAt||a.createdAt||"")));
+  $("msgs").hidden=!open.length;
+  $("c-msgs").textContent=open.length;
+  fill("msgList", open, msgRow);
+}
+
 async function renderItems(){
   await resolveNames();
   const removing=items.filter(i=>i.removeRequested);
@@ -786,8 +843,8 @@ function renderSession(){
     b.hidden=false;
   } else b.hidden=true;
 }
-const TAG={added:"Tillagd",removed:"Borttagen",swapped:"Bytt",replaced:"Ändrad",not_found:"Hittades inte",updated:"Uppdaterad"};
-const TAG_EN={added:"Added",removed:"Removed",swapped:"Swapped",replaced:"Replaced",not_found:"Not found",updated:"Updated"};
+const TAG={added:"Tillagd",removed:"Borttagen",swapped:"Bytt",replaced:"Ändrad",not_found:"Hittades inte",updated:"Uppdaterad",merged:"Ihopslagen"};
+const TAG_EN={added:"Added",removed:"Removed",swapped:"Swapped",replaced:"Replaced",not_found:"Not found",updated:"Updated",merged:"Merged"};
 function changeRow(c, en){
   const li=el("li");
   const T = en ? TAG_EN : TAG;
@@ -909,6 +966,7 @@ $("addBtn").disabled=true; $("prefBtn").disabled=true;
   renderItems(); renderPrefs(); renderLearns();
   db.collection("items").onSnapshot(s=>{ items=s.docs.map(d=>({id:d.id,...d.data()})).filter(i=>i.status!=="ordered"); renderItems(); }, ()=>showBanner("Tappade kontakten med listan. Ladda om sidan."));
   db.collection("prefs").onSnapshot(s=>{ prefs=s.docs.map(d=>({id:d.id,...d.data()})); if(!editing) renderPrefs(); }, ()=>{});
+  db.collection("messages").onSnapshot(s=>{ msgs=s.docs.map(d=>({id:d.id,...d.data()})); renderMsgs(); }, ()=>{});
   db.collection("learnings").onSnapshot(s=>{ learns=s.docs.map(d=>({id:d.id,...d.data()})); renderLearns(); }, ()=>{});
   if(isOwner){
     $("devops").hidden=false; $("tabDevops").hidden=false;
