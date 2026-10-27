@@ -46,6 +46,7 @@ List entries. Written by the page (household) and the agent.
 - `meta/sync` `{at, summary, runId, changes}` — last run summary shown on the page.
 - `meta/prefs` `{changedAt, changedBy}` — bumped on any pref change; drives C3 skipping.
 - `meta/session` `{checkedAt, loggedIn, restored, detail, lastLoggedInAt, loggedOutSince, history:[{t, loggedIn, restored}] (max 48)}` — ICA login state, written hourly by the keepalive task (`task/keepalive.md`). The page shows a banner while `loggedIn` is false.
+- `meta/pendingOrder` `{pending, requestedAt, requestedBy, attempts, lastAttemptAt, lastError, recordedAt?, orderNumber?, cancelledAt?}` — set by "Jag har beställt"; any run that is logged in records the order first (before syncing) and clears it.
 - `meta/config` `{storeId, storeName, ownerName, taskId, deviceName, updatedAt}` — household-specific values the page needs. Written only by the sync agent from the task's CONFIG block (master copy).
 
 ## change entry

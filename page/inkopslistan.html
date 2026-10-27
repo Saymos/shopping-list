@@ -252,6 +252,7 @@ li.flash{box-shadow:inset 4px 0 0 var(--accent)}
       <button class="add" id="syncBtn" type="button">Synka nu</button>
     </div>
     <p class="hint" id="actionMsg" hidden></p>
+    <p class="status" id="pendingOrder" hidden><span id="pendingOrderText"></span> <button class="link" id="pendingOrderUndo" type="button">Ångra</button></p>
     <p class="hint">Synken lägger till nya varor, följer era preferenser och letar erbjudanden och billigare likvärdiga varor för det som är nytt. Sedan betalar du själv hos ICA.</p>
     <div class="actions">
       <a class="cartlink" id="cartLink" hidden target="_blank" rel="noopener">Öppna varukorgen hos ICA ↗</a>
@@ -772,11 +773,21 @@ $("prefForm").addEventListener("submit", async e=>{
   $("prefBtn").disabled=false;
 });
 $("undoRemoving").onclick=async()=>{ for(const it of items.filter(i=>i.removeRequested)) await undoRemove(it); };
+let pendingOrder=null;
+function renderPendingOrder(){
+  const on=!!(pendingOrder&&pendingOrder.pending);
+  $("pendingOrder").hidden=!on;
+  if(on) $("pendingOrderText").textContent="Beställningen från "+when(pendingOrder.requestedAt)+" är inte sparad än – det görs automatiskt vid nästa synk när ICA är inloggat."+(pendingOrder.lastError?" (Senaste försök: "+(pendingOrder.lastError==="logged out"?"utloggad":pendingOrder.lastError)+")":"");
+}
+$("pendingOrderUndo").onclick=()=>write(db.doc("meta/pendingOrder").update({pending:false, cancelledAt:new Date().toISOString(), cancelledBy:myId}));
 $("orderedBtn").onclick=()=>{ $("confirmOrdered").hidden=false; $("orderedBtn").hidden=true; };
 $("orderedNo").onclick=()=>{ $("confirmOrdered").hidden=true; $("orderedBtn").hidden=false; };
 // "Jag har beställt": the run reads the actual placed order from ICA (incl. manual changes made there) and records that.
 $("orderedYes").onclick=async()=>{
   $("confirmOrdered").hidden=true; $("orderedBtn").hidden=false;
+  // Remember the order first: if ICA is logged out, the next sync records it as soon as it's logged in.
+  const prev=pendingOrder&&pendingOrder.pending?pendingOrder:null;
+  await write(db.doc("meta/pendingOrder").set({pending:true, requestedAt:prev?prev.requestedAt:new Date().toISOString(), requestedBy:myId, attempts:prev?(prev.attempts||0):0}));
   await fire("ordered", $("orderedBtn"), "Jag har beställt");
 };
 
@@ -976,6 +987,7 @@ $("addBtn").disabled=true; $("prefBtn").disabled=true;
   }
   db.collection("orders").orderBy("orderedAt","desc").limit(100).onSnapshot(s=>{ orders=s.docs.map(d=>({id:d.id,...d.data()})); renderOrders(); }, ()=>{});
   db.doc("meta/session").onSnapshot(s=>{ session=s.exists?s.data():null; renderSession(); if(isOwner) renderTaskState(); }, ()=>{});
+  db.doc("meta/pendingOrder").onSnapshot(s=>{ pendingOrder=s.exists?s.data():null; renderPendingOrder(); }, ()=>{});
   db.doc("meta/sync").onSnapshot(s=>{
     if(!s.exists) return;
     const d=s.data();
