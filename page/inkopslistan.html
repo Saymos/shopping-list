@@ -259,8 +259,8 @@ li.flash{box-shadow:inset 4px 0 0 var(--accent)}
       <button class="link" id="orderedBtn" type="button" hidden>Jag har beställt</button>
     </div>
     <div class="actions" id="confirmOrdered" hidden>
-      <span class="status">Hämta din senaste beställning från ICA, spara den under Beställningar och töm det som beställts från listan?</span>
-      <button class="add" id="orderedYes" type="button">Ja, hämta</button>
+      <span class="status">Töm det som ligger i varukorgen från listan och spara det under Beställningar? Den riktiga beställningen hämtas från ICA nästa gång Claude är inloggat.</span>
+      <button class="add" id="orderedYes" type="button">Ja, töm</button>
       <button class="link" id="orderedNo" type="button">Avbryt</button>
     </div>
     </div>
@@ -696,7 +696,7 @@ async function renderItems(){
   $("c-all").textContent=all.filter(i=>!i.removeRequested).length;
   const total=cart.reduce((s,i)=>s+(typeof i.price==="number"?i.price:0),0);
   $("sumline").textContent=[cart.length?cart.length+" i varukorgen"+(total?" · "+kr(total):""):"", waiting?waiting+" ej tillagda":"", missing?missing+" hittades inte":""].filter(Boolean).join(" · ");
-  $("orderedBtn").hidden=!cart.length||!db||!mcp||!isOwner;
+  $("orderedBtn").hidden=!cart.length||!db;
   if(pendingFocus) $("lista").open=true;
   fill("list-all", all, itemRow, "<strong>Listan är tom</strong>Skriv en vara i fältet ovan. Allt ni lägger till syns direkt för er båda.");
   if(pendingFocus){
@@ -778,19 +778,42 @@ function renderPendingOrder(){
   const on=!!(pendingOrder&&pendingOrder.pending);
   $("pendingOrder").hidden=!on;
   const two=on && pendingOrder.latestRequestedAt && pendingOrder.latestRequestedAt.slice(0,10)!==String(pendingOrder.requestedAt).slice(0,10);
-  if(on) $("pendingOrderText").textContent=(two?"Beställningarna från "+when(pendingOrder.requestedAt)+" och "+when(pendingOrder.latestRequestedAt)+" är":"Beställningen från "+when(pendingOrder.latestRequestedAt||pendingOrder.requestedAt)+" är")+(two?" inte sparade":" inte sparad")+" än – det görs automatiskt vid nästa synk när ICA är inloggat."+(pendingOrder.lastError?" (Senaste försök: "+(pendingOrder.lastError==="logged out"?"utloggad":pendingOrder.lastError)+")":"");
+  if(on) $("pendingOrderText").textContent="Listan är tömd. "+(two?"Beställningarna från "+when(pendingOrder.requestedAt)+" och "+when(pendingOrder.latestRequestedAt)+" hämtas":"Beställningen från "+when(pendingOrder.latestRequestedAt||pendingOrder.requestedAt)+" hämtas")+" från ICA vid nästa synk när ICA är inloggat."+(pendingOrder.lastError?" (Senaste försök: "+(pendingOrder.lastError==="logged out"?"utloggad":pendingOrder.lastError)+")":"");
 }
-$("pendingOrderUndo").onclick=()=>write(db.doc("meta/pendingOrder").update({pending:false, cancelledAt:new Date().toISOString(), cancelledBy:myId}));
+// Undo: put the provisionally ordered items back in the cart list and drop the provisional order(s).
+$("pendingOrderUndo").onclick=async()=>{
+  const ids=(pendingOrder&&pendingOrder.provisionalOrderIds)||[];
+  for(const oid of ids){
+    const o=orders.find(x=>x.id===oid);
+    for(const iid of ((o&&o.itemIds)||[])) await write(db.doc("items/"+iid).update({status:"in_cart", orderedProvisional:null, provisionalOrderId:null, orderedAt:null}));
+    if(o) await write(db.doc("orders/"+oid).delete());
+  }
+  await write(db.doc("meta/pendingOrder").update({pending:false, provisionalOrderIds:[], cancelledAt:new Date().toISOString(), cancelledBy:myId}));
+};
 $("orderedBtn").onclick=()=>{ $("confirmOrdered").hidden=false; $("orderedBtn").hidden=true; };
 $("orderedNo").onclick=()=>{ $("confirmOrdered").hidden=true; $("orderedBtn").hidden=false; };
-// "Jag har beställt": the run reads the actual placed order from ICA (incl. manual changes made there) and records that.
+// "Jag har beställt": clear the list right away (no ICA login needed) and save a provisional order from the list.
+// The next logged-in run replaces it with the real order from ICA (incl. changes made there).
 $("orderedYes").onclick=async()=>{
   $("confirmOrdered").hidden=true; $("orderedBtn").hidden=false;
-  // Remember the order first: if ICA is logged out, the next sync records it as soon as it's logged in.
   const prev=pendingOrder&&pendingOrder.pending?pendingOrder:null;
   const now=new Date().toISOString();
-  await write(db.doc("meta/pendingOrder").set({pending:true, requestedAt:prev?prev.requestedAt:now, latestRequestedAt:now, requestedBy:myId, attempts:prev?(prev.attempts||0):0}));
-  await fire("ordered", $("orderedBtn"), "Jag har beställt");
+  const cartItems=items.filter(i=>i.status==="in_cart" && !i.removeRequested);
+  let provId=null;
+  if(cartItems.length){
+    provId="list-"+now.replace(/[^0-9]/g,"").slice(0,14);
+    const lines=[];
+    cartItems.forEach(it=>{
+      const ls=Array.isArray(it.lines)&&it.lines.length ? it.lines : [{product:it.product, qty:it.qty, price:it.price}];
+      ls.forEach(l=>lines.push({name:it.name, qty:l.qty||1, product:l.product||"", price:typeof l.price==="number"?l.price:null}));
+    });
+    const total=Math.round(cartItems.reduce((s,i)=>s+(typeof i.price==="number"?i.price:0),0)*100)/100;
+    await write(db.doc("orders/"+provId).set({orderedAt:now, source:"list", provisional:true, total, items:lines, itemIds:cartItems.map(i=>i.id), diffs:[], createdBy:myId}));
+    for(const it of cartItems) await write(db.doc("items/"+it.id).update({status:"ordered", orderedAt:now, orderedProvisional:true, provisionalOrderId:provId}));
+  }
+  await write(db.doc("meta/pendingOrder").set({pending:true, requestedAt:prev?prev.requestedAt:now, latestRequestedAt:now, requestedBy:myId, attempts:prev?(prev.attempts||0):0, provisionalOrderIds:[...((prev&&prev.provisionalOrderIds)||[]), provId].filter(Boolean)}));
+  if(mcp && isOwner) await fire("ordered", $("orderedBtn"), "Jag har beställt");
+  else actionMsg("Listan är tömd. Beställningen hämtas från ICA vid nästa synk.");
 };
 
 async function fire(mode, btn, label){
@@ -825,9 +848,10 @@ function renderOrders(){
     const lines=Array.isArray(o.items)?o.items:[];
     const d=el("details","run");
     const s=el("summary");
-    s.append(el("span","name", new Date(o.orderedAt).toLocaleDateString("sv-SE",{weekday:"short",day:"numeric",month:"short",year:"numeric"})), el("span","meta", lines.length+" varor"+(o.total?" · "+kr(o.total):"")+(o.orderNumber?" · order "+o.orderNumber:"")+(o.source==="list"?" · från listan":"")));
+    s.append(el("span","name", new Date(o.orderedAt).toLocaleDateString("sv-SE",{weekday:"short",day:"numeric",month:"short",year:"numeric"})), el("span","meta", lines.length+" varor"+(o.total?" · "+kr(o.total):"")+(o.orderNumber?" · order "+o.orderNumber:"")+(o.provisional?" · preliminär":o.source==="list"?" · från listan":"")));
     d.append(s);
     const body=el("div","body");
+    if(o.provisional) body.append(el("div","meta","Sparad från listan. Byts mot den riktiga beställningen från ICA vid nästa synk när ICA är inloggat."));
     if(o.delivery) body.append(el("div","meta","Leverans: "+o.delivery));
     const diffs=Array.isArray(o.diffs)?o.diffs:[];
     if(diffs.length){ body.append(el("span","alts-label","Ändrat i ICA innan beställning ("+diffs.length+")")); const dl=el("ul","chg"); diffs.forEach(x=>{ const li=el("li"); li.append(el("div","meta",x)); dl.append(li); }); body.append(dl); }

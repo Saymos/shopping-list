@@ -25,6 +25,7 @@ List entries. Written by the page (household) and the agent.
 | syncNote | string (sv) | agent | Shown when status is `not_found` or a pref can't be met. |
 | prefsCheckedAt, priceCheckedAt | ISO | agent | Incremental-work timestamps. |
 | addedBy, addedAt, orderedAt | user id, ISO, ISO | page/agent | |
+| orderedProvisional, provisionalOrderId | bool, id | page | Cleared by "Jag har beställt" before the real ICA order was read. |
 
 ## prefs/{id}
 `{text, strict, fromLearning, addedBy, addedAt, updatedAt}` — `strict:true` = "Alltid", otherwise "Helst".
@@ -33,7 +34,7 @@ List entries. Written by the page (household) and the agent.
 `{text, evidence, suggestedPref, createdAt, updatedAt}` — agent-written; page can promote to a pref or delete.
 
 ## orders/{id}
-`{orderedAt, orderNumber, delivery, total, source:"ica"|"list", items:[{name, qty, product, price}], diffs:[string]}` — created only by the agent in `ordered` mode. Never modified.
+`{orderedAt, orderNumber, delivery, total, source:"ica"|"list", provisional?, itemIds?, items:[{name, qty, product, price}], diffs:[string]}` — real orders are created by the agent; the page creates a provisional one (source "list") when "Jag har beställt" clears the list, and the agent replaces it with the real ICA order(s) at the next logged-in run.
 
 ## messages/{id}
 `{text, kind:"info"|"question", topic, itemId?, itemName?, options?, runId, createdAt, updatedAt, answer?, answeredAt?, answeredBy?, dismissedAt?, dismissedBy?, resolvedAt?, resolution?}` — the agent talks to the household ("Från Claude" on the page). The page writes `answer` (null = withdrawn) and `dismissedAt`; the agent applies answers at the next sync and sets `resolvedAt`. Deleted 14 days after resolved/dismissed.
@@ -46,7 +47,7 @@ List entries. Written by the page (household) and the agent.
 - `meta/sync` `{at, summary, runId, changes}` — last run summary shown on the page.
 - `meta/prefs` `{changedAt, changedBy}` — bumped on any pref change; drives C3 skipping.
 - `meta/session` `{checkedAt, loggedIn, restored, detail, lastLoggedInAt, loggedOutSince, history:[{t, loggedIn, restored}] (max 48)}` — ICA login state, written hourly by the keepalive task (`task/keepalive.md`). The page shows a banner while `loggedIn` is false.
-- `meta/pendingOrder` `{pending, requestedAt (first press), latestRequestedAt (latest press), requestedBy, attempts, lastAttemptAt, lastError, recordedAt?, orderNumbers?, cancelledAt?}` — set by "Jag har beställt"; any run that is logged in records the order first (before syncing) and clears it.
+- `meta/pendingOrder` `{pending, requestedAt (first press), latestRequestedAt (latest press), requestedBy, attempts, lastAttemptAt, lastError, recordedAt?, orderNumbers?, provisionalOrderIds?, cancelledAt?}` — set by "Jag har beställt"; any run that is logged in records the order first (before syncing) and clears it.
 - `meta/config` `{storeId, storeName, ownerName, taskId, deviceName, updatedAt}` — household-specific values the page needs. Written only by the sync agent from the task's CONFIG block (master copy).
 
 ## change entry
