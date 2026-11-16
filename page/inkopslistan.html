@@ -778,7 +778,7 @@ function renderPendingOrder(){
   const on=!!(pendingOrder&&pendingOrder.pending);
   $("pendingOrder").hidden=!on;
   const two=on && pendingOrder.latestRequestedAt && pendingOrder.latestRequestedAt.slice(0,10)!==String(pendingOrder.requestedAt).slice(0,10);
-  if(on) $("pendingOrderText").textContent=(two?"Beställningarna från "+when(pendingOrder.requestedAt)+" och "+when(pendingOrder.latestRequestedAt)+" är":"Beställningen från "+when(pendingOrder.latestRequestedAt||pendingOrder.requestedAt)+" är")+" inte sparade än – det görs automatiskt vid nästa synk när ICA är inloggat."+(pendingOrder.lastError?" (Senaste försök: "+(pendingOrder.lastError==="logged out"?"utloggad":pendingOrder.lastError)+")":"");
+  if(on) $("pendingOrderText").textContent=(two?"Beställningarna från "+when(pendingOrder.requestedAt)+" och "+when(pendingOrder.latestRequestedAt)+" är":"Beställningen från "+when(pendingOrder.latestRequestedAt||pendingOrder.requestedAt)+" är")+(two?" inte sparade":" inte sparad")+" än – det görs automatiskt vid nästa synk när ICA är inloggat."+(pendingOrder.lastError?" (Senaste försök: "+(pendingOrder.lastError==="logged out"?"utloggad":pendingOrder.lastError)+")":"");
 }
 $("pendingOrderUndo").onclick=()=>write(db.doc("meta/pendingOrder").update({pending:false, cancelledAt:new Date().toISOString(), cancelledBy:myId}));
 $("orderedBtn").onclick=()=>{ $("confirmOrdered").hidden=false; $("orderedBtn").hidden=true; };
